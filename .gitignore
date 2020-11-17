@@ -1,0 +1,6 @@
+/build/
+/bin/
+/vendor/
+*~
+go.sum
+

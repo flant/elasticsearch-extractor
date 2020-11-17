@@ -1,0 +1,421 @@
+<!doctype html>
+<html>
+<head>
+<title>Elasticsearch: restore snapshots</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<link rel="stylesheet" href="/assets/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous"> 
+<style>
+body {
+  padding-top: 56px;
+}
+
+</style>
+
+</head>
+<body>
+<header>
+<nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+  <a class="navbar-brand" href="#">X-tractor</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+    </div>
+</nav>
+</header>
+
+  <!-- Page Content -->
+  <div class="container-fluid">
+    <div class="row">
+      <!-- Blog Entries Column -->
+
+
+      <!-- Sidebar Widgets Column -->
+      <div class="col-md-2">
+        <!-- Side Widget -->
+        <div class="card my-4">
+          <h5 class="card-header">Repositories</h5>
+          <div class="card-body">
+            <ul class="list-unstyled list-group mb-0" id="repolist"> </ul>
+          </div>
+        </div>
+
+        <div class="card my-4">
+          <h5 class="card-header">Results</h5>
+          <div class="card-body" id="result">
+          </div>
+        </div>
+
+        <!-- Categories Widget -->
+        <div class="card my-4">
+          <h5 class="card-header">Nodes</h5>
+          <div class="card-body">
+            <ul class="list-unstyled mb-0" id="nodelist"> </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+
+        <h1 class="my-4">Snapshots list
+          <small id="selectedsnap"></small>
+        </h1>
+        <small  class="text-monospace">Attention! The <strong>SNAPSHOT-2020.05.06</strong> contains the index for the <strong>previous</strong> day.</small>
+        
+        <div class="d-flex align-items-center invisible" id="loading"><strong>Loading...</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>
+        <ul class="list-unstyled mb-0 overflow-auto" style="max-height: 800px;" id="snapshotlist"> </ul>
+
+      </div>       
+      
+      <!-- Sidebar Widgets Column -->
+      <div class="col-md-4">
+        <!-- Side Widget -->
+        <div class="card my-4">
+          <h5 class="card-header">Restored indices</h5>
+          <div class="card-body">
+            <ul class="list-unstyled list-group mb-0" id="indlist"> </ul>
+          </div>
+          <div class="card-footer bg-warning">
+            <small  class="text-monospace">Attention! The <strong>extracted_*</strong> indices will be deleted 48 hours after they were created.</small>
+          </div>        
+        </div>
+    </div>
+    <!-- /.row -->
+  </div>
+  <!-- /.container -->
+
+<div class="modal fade" tabindex="-1" id="update_instance" role="dialog">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="exampleModalLabel">X-tract indices from snapshot</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <form action="/api/" role="form" class="form-horizontal" method="POST" id="update_form">
+      <div class="modal-body">
+        <input type="hidden" name="action" value="restore">
+        <input type="hidden" name="snapshot" id="r_snapshot">
+        <input type="hidden" name="repo" id="r_repo">
+          <div class="form-group">
+            <label for="exampleFormControlSelect2">Indices in snapshot</label>
+            <select multiple class="form-control" name="indices[]" id="indices">
+            </select>
+          </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="restore"  data-dismiss="modal">Restore</button>
+      </div>
+    </div>
+    </form>
+  </div>
+
+</div><!-- /.modal -->
+
+</body>
+
+<script src="/assets/js/jquery-3.5.1.min.js"></script>
+<script src="/assets/js/bootstrap.min.js"></script>
+
+<script>
+
+var getnodes = setInterval(NodeStatus, 5000);
+var getindices = setInterval(IndexList, 3000);
+
+function bytesToSize(bytes) {
+   var sizes = ['b', 'kb', 'mb', 'gb', 'tb'];
+   if (bytes == 0) return '0 byte';
+   var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+   return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+}
+
+function IndexList() {
+    var post = {
+      "action": "get_indices"
+    };
+    
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        var str = "";
+        var health = "text-success";
+        pc = "bg-success";
+        for(var k in data) {
+          var percent = 0;
+          var p = 0;
+          var ts = 0;
+          var del_button = "";
+          var done='';
+          
+          var trash = '<svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-trash"  data-id="' + k + '" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>';
+          
+          for (i=0; i<data[k].shards.length;i++) {
+            p+=parseInt(data[k].shards[i].index.size.percent);
+            ts+=data[k].shards[i].index.size.total_in_bytes;
+          }
+          prc = p/data[k].shards.length;
+          if (prc < 60) {
+            pc = "bg-danger";
+            done = 'text-danger';
+            del_button = "";
+          }
+          if (prc > 60) {
+            pc = "bg-warning";
+            done = 'text-warning';
+            del_button = "";
+          }
+          if (prc >= 100) {
+            pc = "bg-success";
+            done = 'text-success';
+            del_button = "<a href='#' class='del_button' title='Delete it' data-id='" + k + "'>"+trash+"</a>";
+          }
+
+          basket = '<svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-folder2-open ' + done + '" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M1 3.5A1.5 1.5 0 0 1 2.5 2h2.764c.958 0 1.76.56 2.311 1.184C7.985 3.648 8.48 4 9 4h4.5A1.5 1.5 0 0 1 15 5.5v.64c.57.265.94.876.856 1.546l-.64 5.124A2.5 2.5 0 0 1 12.733 15H3.266a2.5 2.5 0 0 1-2.481-2.19l-.64-5.124A1.5 1.5 0 0 1 1 6.14V3.5zM2 6h12v-.5a.5.5 0 0 0-.5-.5H9c-.964 0-1.71-.629-2.174-1.154C6.374 3.334 5.82 3 5.264 3H2.5a.5.5 0 0 0-.5.5V6zm-.367 1a.5.5 0 0 0-.496.562l.64 5.124A1.5 1.5 0 0 0 3.266 14h9.468a1.5 1.5 0 0 0 1.489-1.314l.64-5.124A.5.5 0 0 0 14.367 7H1.633z"/></svg>';
+          
+          str += "<li>"+ basket + "&nbsp;" + k + "<span class='float-right'>" + bytesToSize(ts) + "&nbsp;&nbsp;" + del_button+ "</span>";
+          str += "<div class='progress'  style='height: 3px;'>";
+          str += "<div class='progress-bar " + pc + "' role='progressbar' style='width: " + prc + "%;' aria-valuenow='" + prc + "' aria-valuemin='0' aria-valuemax='100'></div>";
+          str += "</div><br></li>";
+          
+        }
+        $('#indlist').html(str);
+      }
+    });
+}
+
+function NodeStatus() {
+    var post = {
+      "action": "get_nodes"
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        var str = "";
+        var pc = "";
+        for(var k in data) {
+            if (data[k].dup < 70) {
+              pc = "bg-success"
+            }
+            if (data[k].dup > 70) {
+              pc = "bg-warning"
+            }
+            if (data[k].dup > 85) {
+              pc = "bg-danger"
+            }
+            str += "<li><h4 class='small font-weight-bold'>" + data[k].name + " / " + data[k].ip + "<span class='float-right'>" + data[k].dt + "</span></h4>";
+            str += "<div class='progress' style='height: 30px;'>";
+            str += "<div class='progress-bar " + pc + "' role='progressbar' style='width: " + data[k].dup + "%;' aria-valuenow='" + data[k].dup + "' aria-valuemin='0' aria-valuemax='100'>" + data[k].dup + "%</div>";
+            str += "</div><br></li>";
+            pc = "";
+        }
+        $('#nodelist').html(str);
+      }
+    });
+}
+
+
+$(document).ready(function(){
+    var post = {
+      "action": "get_repositories"
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+
+        var str = "";
+        for(var k in data) {
+          var type = data[k].type;
+          switch (type) {
+            case "fs": {
+              basket = '<svg width="1.3em" height="1.3em" viewBox="0 0 16 16" class="bi bi-files" fill="currentColor" xmlns="http://www.w3.org/2000/svg"> <path fill-rule="evenodd" d="M4 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zm0 1a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H4z"/> <path d="M6 0h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2v-1a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1H4a2 2 0 0 1 2-2z"/></svg>';
+              break;
+            }
+            case "url": {
+              basket = '<svg width="1.3em" height="1.3em" viewBox="0 0 16 16" class="bi bi-link" fill="currentColor" xmlns="http://www.w3.org/2000/svg"> <path d="M6.354 5.5H4a3 3 0 0 0 0 6h3a3 3 0 0 0 2.83-4H9c-.086 0-.17.01-.25.031A2 2 0 0 1 7 10.5H4a2 2 0 1 1 0-4h1.535c.218-.376.495-.714.82-1z"/> <path d="M9 5.5a3 3 0 0 0-2.83 4h1.098A2 2 0 0 1 9 6.5h3a2 2 0 1 1 0 4h-1.535a4.02 4.02 0 0 1-.82 1H12a3 3 0 1 0 0-6H9z"/></svg>';
+              break;
+            }
+            default : {
+              basket = '<svg width="1.3em" height="1.3em" viewBox="0 0 16 16" class="bi bi-cloud" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/></svg>';
+              break;
+            }
+          }
+          str = "<li><h4 class='font-weight-bold'><a href='#' class='repos list-group-item list-group-item-action' data-id='" + data[k].id + "'>"+ basket + "&nbsp;" + data[k].id + "</a></h4></li>";
+          $('#repolist').append(str);
+        }
+      }  
+    });
+
+    NodeStatus();
+    IndexList();
+});
+
+$('#repolist').on('click', 'a.repos', function(e) {
+    var reponame = e.target.dataset.id;
+
+    $("#loading").removeClass('invisible');
+
+    $('#selectedsnap').html("from <strong>"+reponame+"</strong>");
+
+    var post = {
+      "action": "get_snapshots",
+      "values" : {
+        "repo": reponame
+      }
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        var str = "";
+
+        dlicon = '<svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-download" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path fill-rule="evenodd" d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>';
+
+        for(var k in data) {
+          snapshot = data[k].id;
+          uniqid = data[k].start_epoch;
+          status = data[k].status;
+          date = new Date(data[k].start_epoch * 1000);
+          hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
+          restore_button = "";
+
+          if (status == "SUCCESS") {
+            icon = '<svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-server text-success" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M1.333 2.667C1.333 1.194 4.318 0 8 0s6.667 1.194 6.667 2.667V4C14.665 5.474 11.68 6.667 8 6.667 4.318 6.667 1.333 5.473 1.333 4V2.667zm0 3.667v3C1.333 10.805 4.318 12 8 12c3.68 0 6.665-1.193 6.667-2.665V6.334c-.43.32-.931.58-1.458.79C11.81 7.684 9.967 8 8 8c-1.967 0-3.81-.317-5.21-.876a6.508 6.508 0 0 1-1.457-.79zm13.334 5.334c-.43.319-.931.578-1.458.789-1.4.56-3.242.876-5.209.876-1.967 0-3.81-.316-5.21-.876a6.51 6.51 0 0 1-1.457-.79v1.666C1.333 14.806 4.318 16 8 16s6.667-1.194 6.667-2.667v-1.665z"/></svg>';
+            restore_button = "<a href='#' class='float-right btn' title='X-tract it' data-target='#update_instance' data-toggle='modal' data-repo='" + reponame + "' data-id='" + data[k].id + "'>"+dlicon+"</a>";
+          } else {
+            icon = '<svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-server text-danger" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M1.333 2.667C1.333 1.194 4.318 0 8 0s6.667 1.194 6.667 2.667V4C14.665 5.474 11.68 6.667 8 6.667 4.318 6.667 1.333 5.473 1.333 4V2.667zm0 3.667v3C1.333 10.805 4.318 12 8 12c3.68 0 6.665-1.193 6.667-2.665V6.334c-.43.32-.931.58-1.458.79C11.81 7.684 9.967 8 8 8c-1.967 0-3.81-.317-5.21-.876a6.508 6.508 0 0 1-1.457-.79zm13.334 5.334c-.43.319-.931.578-1.458.789-1.4.56-3.242.876-5.209.876-1.967 0-3.81-.316-5.21-.876a6.51 6.51 0 0 1-1.457-.79v1.666C1.333 14.806 4.318 16 8 16s6.667-1.194 6.667-2.667v-1.665z"/></svg>';
+            restore_button = "";
+          }
+
+          str += "<li><h5 class='font-weight-bold  list-group-item list-group-item-action' title='"+status+"'>"+icon+" <strong>" + snapshot + "</strong> created at " + hdate + restore_button +"</h5></li>";
+        }
+
+        $("#loading").addClass('invisible');
+        $('#snapshotlist').html(str);
+    }
+  });
+});
+
+
+$('#indlist').on('click', 'a.del_button', function(e) {
+    console.log(e)
+    var name = e.currentTarget.dataset.id;
+// TODO: immeditaly remove index
+    var post = {
+      "action": "del_index",
+      "values" : {
+        "index": name
+      }
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        $("#result").html('<div class="alert alert-danger alert-dismissible fade show">Index deleted<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+      },
+      error: function (data) {
+        $("#result").html('<div class="alert alert-danger alert-dismissible fade show">'+data.responseJSON.error+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+      }
+    });
+    event.preventDefault();
+});
+
+
+$('#update_instance').on('shown.bs.modal',function(e){
+    var snapshot = $(e.relatedTarget).data('id');
+    var repo = $(e.relatedTarget).data('repo');
+    
+    $('#indices').find('option')
+    .remove()
+    .end();
+    
+    var post = {
+      "action": "get_snapshot",
+      "values" : {
+        "repo": repo,
+        "snapshot": snapshot
+      }
+    };
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        var indices = data.snapshots[0].indices;
+        console.log(indices)
+        for (k in indices) {
+          optText = k+" / "+bytesToSize(indices[k].stats.total.size_in_bytes);
+          optValue = k;
+          $('#indices').append(new Option(optText, optValue,true,true));
+        }
+      }
+    });
+    
+    $(r_repo).val(repo);
+    $(r_snapshot).val(snapshot);
+    
+});
+
+
+$("#restore").click(function(){
+    var post = {
+      "action": "restore",
+      "values" : {
+        "repo": $('#r_repo').val(),
+        "snapshot": $('#r_snapshot').val(),
+        "indices": $('#indices').val()
+      }
+    };
+    
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        if ( data.error == 0 ) {
+          $("#result").html('<div class="alert alert-success alert-dismissible fade show">'+data.message+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>');
+        } else {
+          $("#result").html('<div class="alert alert-danger alert-dismissible fade show">'+data.message+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+        }
+      },
+      error: function (data) {
+        $("#result").html('<div class="alert alert-danger alert-dismissible fade show">'+data.responseJSON.error+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+      }
+    });
+    event.preventDefault();
+});
+
+$('#update_instance').on('hidden.bs.modal',function(){
+	$('#update_form').trigger('reset');
+});
+
+</script>
+
+</html>

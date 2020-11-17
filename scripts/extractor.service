@@ -1,0 +1,15 @@
+[Unit]
+Description=X-tractor - tools to restore Elastic's snapshots 
+After=network.target
+
+[Service]
+Type=simple
+TimeoutStartSec=60
+LimitNOFILE=100000
+WorkingDirectory=/usr/local/sbin
+ExecStart=/usr/local/sbin/extractor -config /usr/local/etc/extractor.yml
+ExecStop=/bin/kill -3 $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
