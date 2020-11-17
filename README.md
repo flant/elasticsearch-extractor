@@ -8,13 +8,13 @@ Requires Elasticsearch v7.0 or greater.
 
 To install *extractor* on Linux use the following commands:
 
-    $ git clone https://github.com/uzhinskiy/extractor.git
-    $ cd extractor
+    $ git clone https://github.com/flant/elasticsearch-extractor.git
+    $ cd elasticsearch-extractor
     $ make
 
 ## USAGE ##
 
-    $ sudo cp ./build/extractor /usr/local/sbin/
+    $ sudo cp ./build/elasticsearch-extractor /usr/local/sbin/extractor
     $ sudo cp main.yml /usr/local/etc/extractor.yml
     $ sudo cp ./scripts/extractor.service /etc/systemd/system/
     $ edit /usr/local/etc/extractor.yml
