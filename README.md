@@ -1,22 +1,21 @@
-# extractor
-Extractor is a web tool for an extracting specific indices from the indicated repository, from the snapshot identified by users choice.
+**elasticsearch-extractor** is a simple web UI for end users to extract any index from the desired Elasticsearch snapshot within repository (S3-compatible or any other registered in your cluster).
 
-Requires Elasticsearch v7.0 or greater.
+It requires Elasticsearch v7.0 or greater.
 
+# Installing
 
-## INSTALL ##
+To build & install elasticsearch-extractor on Linux (with systemd), please use the following commands:
 
-To install *extractor* on Linux use the following commands:
+```
+$ git clone https://github.com/flant/elasticsearch-extractor.git
+$ cd elasticsearch-extractor
+$ make
+$ sudo cp ./build/elasticsearch-extractor /usr/local/sbin/extractor
+$ sudo cp main.yml /usr/local/etc/extractor.yml
+$ sudo cp ./scripts/extractor.service /etc/systemd/system/
+$ vim /usr/local/etc/extractor.yml # config is small and self-descriptive
+$ sudo systemctl daemon-reload && systemctl start extractor
+$ sudo systemctl enable extractor
+```
 
-    $ git clone https://github.com/flant/elasticsearch-extractor.git
-    $ cd elasticsearch-extractor
-    $ make
-
-## USAGE ##
-
-    $ sudo cp ./build/elasticsearch-extractor /usr/local/sbin/extractor
-    $ sudo cp main.yml /usr/local/etc/extractor.yml
-    $ sudo cp ./scripts/extractor.service /etc/systemd/system/
-    $ edit /usr/local/etc/extractor.yml
-    $ sudo systemctl daemon-reload && systemctl start extractor
-    $ sudo systemctl enable extractor
+# Using
