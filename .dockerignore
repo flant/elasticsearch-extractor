@@ -1,0 +1,7 @@
+.git
+build
+bin
+vendor
+*~
+go.sum
+
