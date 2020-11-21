@@ -55,6 +55,10 @@ func (rt *Router) netClientPrepare() {
 func (rt *Router) doDel(url string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("DELETE", url, nil)
+	if rt.conf.Elastic.Username != "" {
+		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
+	}
+
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 
@@ -81,6 +85,10 @@ func (rt *Router) doDel(url string) ([]byte, error) {
 func (rt *Router) doGet(url string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("GET", url, nil)
+	if rt.conf.Elastic.Username != "" {
+		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
+	}
+
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 
@@ -108,6 +116,10 @@ func (rt *Router) doPost(url string, request map[string]interface{}) ([]byte, er
 	toBackend, _ := json.Marshal(request)
 
 	actionRequest, _ := http.NewRequest("POST", url, bytes.NewReader(toBackend))
+	if rt.conf.Elastic.Username != "" {
+		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
+	}
+
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 

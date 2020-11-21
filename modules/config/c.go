@@ -25,9 +25,11 @@ type Config struct {
 		TimeOut int    `yaml:"timeout"`
 	} `yaml:"app"`
 	Elastic struct {
-		Host string `yaml:"host`
-		SSL  bool   `yaml:"ssl"`
-		Cert string `yaml:"certfile"`
+		Host     string `yaml:"host`
+		SSL      bool   `yaml:"ssl"`
+		Username string `yaml:"username"`
+		Password string `yaml:"password"`
+		Cert     string `yaml:"certfile"`
 	} `yaml:"elastic"`
 }
 

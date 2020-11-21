@@ -92,7 +92,7 @@ func _404Html() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "404.html", size: 19, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "404.html", size: 19, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -112,7 +112,7 @@ func assetsCssBootstrapMinCss() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/css/bootstrap.min.css", size: 160392, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/css/bootstrap.min.css", size: 160392, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -132,7 +132,7 @@ func assetsCssBootstrapMinCssMap() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/css/bootstrap.min.css.map", size: 562427, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/css/bootstrap.min.css.map", size: 562427, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -152,7 +152,7 @@ func assetsFontsGlyphiconsHalflingsRegularTtf() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/fonts/glyphicons-halflings-regular.ttf", size: 41236, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/fonts/glyphicons-halflings-regular.ttf", size: 41236, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -172,7 +172,7 @@ func assetsJsBootstrapBundleMinJsMap() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/js/bootstrap.bundle.min.js.map", size: 294126, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/js/bootstrap.bundle.min.js.map", size: 294126, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -192,7 +192,7 @@ func assetsJsBootstrapMinJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/js/bootstrap.min.js", size: 84152, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/js/bootstrap.min.js", size: 84152, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -212,7 +212,7 @@ func assetsJsBootstrapMinJsMap() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/js/bootstrap.min.js.map", size: 176087, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/js/bootstrap.min.js.map", size: 176087, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -232,7 +232,7 @@ func assetsJsJquery351MinJs() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "assets/js/jquery-3.5.1.min.js", size: 89476, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "assets/js/jquery-3.5.1.min.js", size: 89476, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -252,7 +252,7 @@ func faviconIco() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "favicon.ico", size: 1150, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "favicon.ico", size: 1150, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -272,7 +272,7 @@ func indexHtml() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "index.html", size: 17962, mode: os.FileMode(436), modTime: time.Unix(1605640439, 0)}
+	info := bindataFileInfo{name: "index.html", size: 17962, mode: os.FileMode(436), modTime: time.Unix(1605991829, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }

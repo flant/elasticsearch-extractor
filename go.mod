@@ -12,9 +12,9 @@ replace github.com/flant/elasticsearch-extractor/modules/version => ./modules/ve
 
 require (
 	github.com/flant/elasticsearch-extractor/modules/config v0.0.0
-	github.com/flant/elasticsearch-extractor/modules/front v0.0.0
+	github.com/flant/elasticsearch-extractor/modules/front v0.0.0 // indirect
 	github.com/flant/elasticsearch-extractor/modules/router v0.0.0
 	github.com/flant/elasticsearch-extractor/modules/version v0.0.0
 	github.com/uzhinskiy/lib.go v0.1.3 // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )

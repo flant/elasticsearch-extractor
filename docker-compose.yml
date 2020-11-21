@@ -5,13 +5,17 @@ services:
   app:
     build:
       context: .
-      dockerfile: scripts/Dockerfile
+      dockerfile: Dockerfile
     restart: always
+    extra_hosts:
+       elasticsearch: 10.4.3.224
     networks:
       - internal_network
     image: extractor
     hostname: es-ext
+    ports:
+      - "0.0.0.0:9400:9400"
     expose:
       - "9400"
     volumes:
-      - ./main.yml:/usr/local/etc/main.yml
+      - ./main.yml:/app/main.yml

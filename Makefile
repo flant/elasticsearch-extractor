@@ -17,7 +17,7 @@ build:
 	@echo "Building $(GOFILES) to ./build"
 	cd front && go-bindata -pkg front -o ../modules/front/front.go ./...
 	cd ../
-	go mod vendor
+#	go mod vendor
 	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "-s -w -X main.vBuild=${BUILD}" -o build/$(GONAME) $(GOFILES)
 	strip ./build/$(GONAME)
 

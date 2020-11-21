@@ -111,7 +111,7 @@ func Run(cnf config.Config) {
 
 	http.HandleFunc("/", rt.FrontHandler)
 	http.HandleFunc("/api/", rt.ApiHandler)
-	http.ListenAndServe(":"+cnf.App.Port, nil)
+	http.ListenAndServe("0.0.0.0:"+cnf.App.Port, nil)
 }
 
 // web-ui
