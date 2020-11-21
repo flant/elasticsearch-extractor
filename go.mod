@@ -12,7 +12,7 @@ replace github.com/flant/elasticsearch-extractor/modules/version => ./modules/ve
 
 require (
 	github.com/flant/elasticsearch-extractor/modules/config v0.0.0
-	github.com/flant/elasticsearch-extractor/modules/front v0.0.0 // indirect
+	github.com/flant/elasticsearch-extractor/modules/front v0.0.0
 	github.com/flant/elasticsearch-extractor/modules/router v0.0.0
 	github.com/flant/elasticsearch-extractor/modules/version v0.0.0
 	github.com/uzhinskiy/lib.go v0.1.3 // indirect

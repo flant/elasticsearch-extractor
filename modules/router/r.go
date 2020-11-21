@@ -24,9 +24,9 @@ import (
 
 	"time"
 
-	"github.com/uzhinskiy/extractor/modules/config"
-	"github.com/uzhinskiy/extractor/modules/front"
-	"github.com/uzhinskiy/extractor/modules/version"
+	"github.com/flant/elasticsearch-extractor/modules/config"
+	"github.com/flant/elasticsearch-extractor/modules/front"
+	"github.com/flant/elasticsearch-extractor/modules/version"
 	"github.com/uzhinskiy/lib.go/helpers"
 )
 
