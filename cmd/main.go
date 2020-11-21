@@ -18,9 +18,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/uzhinskiy/extractor/modules/config"
-	"github.com/uzhinskiy/extractor/modules/router"
-	"github.com/uzhinskiy/extractor/modules/version"
+	"github.com/flant/elasticsearch-extractor/modules/config"
+	"github.com/flant/elasticsearch-extractor/modules/router"
+	"github.com/flant/elasticsearch-extractor/modules/version"
 )
 
 var (

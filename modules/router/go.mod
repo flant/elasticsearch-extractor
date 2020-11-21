@@ -1,3 +1,3 @@
-module github.com/uzhinskiy/extractor/modules/router
+module github.com/flant/elasticsearch-extractor/modules/router
 
 go 1.14

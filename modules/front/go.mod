@@ -1,1 +1,1 @@
-module github.com/uzhinskiy/extractor/modules/front
+module github.com/flant/elasticsearch-extractor/modules/front

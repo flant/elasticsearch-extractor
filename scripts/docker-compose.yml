@@ -1,0 +1,17 @@
+version: "2.0"
+networks:
+  internal_network:
+services:
+  app:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    restart: always
+    networks:
+      - internal_network
+    image: extractor
+    hostname: es-ext
+    expose:
+      - "9400"
+    volumes:
+      - ./main.yml:/usr/local/etc/main.yml
