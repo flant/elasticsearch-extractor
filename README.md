@@ -19,3 +19,4 @@ $ sudo systemctl enable extractor
 ```
 
 # Using
+    docker-compose up --build --force-recreate -d
