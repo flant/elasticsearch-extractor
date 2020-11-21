@@ -8,7 +8,7 @@ services:
       dockerfile: Dockerfile
     restart: always
     extra_hosts:
-       elasticsearch: 10.4.3.224
+       elasticsearch: 192.168.0.23 #Elasticsearch IP
     networks:
       - internal_network
     image: extractor
