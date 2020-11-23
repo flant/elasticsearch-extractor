@@ -3,7 +3,7 @@ app:
   timeout: 60
 elastic:
   host: http://elasticsearch:9200/
-  username: elastic
-  password: elastic
+# use this fields if elastic requires BA
+#  username: elastic
+#  password: elastic
   ssl: false
-  certfile: ./ca.crt

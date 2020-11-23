@@ -1,5 +1,5 @@
 # stage 1: build
-FROM golang:1.14.4 AS builder
+FROM golang:latest AS builder
 LABEL maintainer="Uzhinskiy Boris <boris.uzhinsky@flant.com>"
 
 # Add source code
