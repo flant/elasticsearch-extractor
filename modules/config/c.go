@@ -30,6 +30,7 @@ type Config struct {
 		Username string `yaml:"username"`
 		Password string `yaml:"password"`
 		Cert     string `yaml:"certfile"`
+		Include  bool   `yaml:"include_system"`
 	} `yaml:"elastic"`
 }
 

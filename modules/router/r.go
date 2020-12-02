@@ -20,6 +20,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -251,6 +252,17 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			var snap_list snapList
 			_ = json.Unmarshal(response, &snap_list)
 
+			if !rt.conf.Elastic.Include {
+				for i := 0; i < (len(snap_list) - 1); i++ {
+					matched, err := regexp.MatchString(`^[\.]\S+`, snap_list[i].Id)
+					if err != nil {
+						log.Println("Regex error for ", snap_list[i].Id)
+					}
+					if matched {
+						snap_list = remove(snap_list, i)
+					}
+				}
+			}
 			if request.Values.OrderType == "time" {
 
 				if request.Values.OrderDir == "asc" {
@@ -475,4 +487,10 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 	rt.nodes = na
 	return nresp, nil
 
+}
+
+func remove(s snapList, i int) snapList {
+	s[i] = s[len(s)-1]
+	// We do not need to put s[i] at the end, as it will be discarded anyway
+	return s[:len(s)-1]
 }
