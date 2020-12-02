@@ -266,9 +266,9 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 				j := 0
 				for _, n := range snap_list {
-					matched, err := regexp.MatchString(`^[\.]\S+`, snap_list[j].Id)
+					matched, err := regexp.MatchString(`^[\.]\S+`, n.Id)
 					if err != nil {
-						log.Println("Regex error for ", snap_list[j].Id)
+						log.Println("Regex error for ", n.Id)
 					}
 					if !matched {
 						snap_list[j] = n
