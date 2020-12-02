@@ -4,7 +4,9 @@ app:
 elastic:
   host: http://elasticsearch:9200/
 # use this fields if elastic requires BA
-  username: elastic
-  password: elastic
+#  username: elastic
+#  password: elastic
   ssl: false
-  include_system: true
+# Видим-ли в списке снапшотов системые (.kibana* / .opendistro* )
+# значение по умолчанию = false, то-есть не видим
+  include_system: false
