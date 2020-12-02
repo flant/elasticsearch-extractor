@@ -249,19 +249,35 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
 				return
 			}
+
 			var snap_list snapList
 			_ = json.Unmarshal(response, &snap_list)
 
 			if !rt.conf.Elastic.Include {
-				for i := 0; i < (len(snap_list) - 1); i++ {
-					matched, err := regexp.MatchString(`^[\.]\S+`, snap_list[i].Id)
+				/*for i := 0; i < (len(snap_list_pre) - 1); i++ {
+					matched, err := regexp.MatchString(`^[\.]\S+`, snap_list_pre[i].Id)
 					if err != nil {
-						log.Println("Regex error for ", snap_list[i].Id)
+						log.Println("Regex error for ", snap_list_pre[i].Id)
 					}
 					if matched {
-						snap_list = remove(snap_list, i)
+						snap_list = remove(snap_list_pre, i)
 					}
+				}*/
+
+				j := 0
+				for _, n := range snap_list {
+					matched, err := regexp.MatchString(`^[\.]\S+`, snap_list[j].Id)
+					if err != nil {
+						log.Println("Regex error for ", snap_list[j].Id)
+					}
+					if !matched {
+						snap_list[j] = n
+						j++
+					}
+
 				}
+				snap_list = snap_list[:j]
+
 			}
 			if request.Values.OrderType == "time" {
 
