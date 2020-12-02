@@ -20,6 +20,7 @@ import (
 	"mime"
 	"net/http"
 	"path"
+	"sort"
 	"strings"
 
 	"time"
@@ -34,15 +35,18 @@ type Router struct {
 	conf  config.Config
 	nc    *http.Client
 	nodes nodesArray
+	sl    snapList
 }
 
 type apiRequest struct {
 	Action string `json:"action,omitempty"` // Имя вызываемого метода*
 	Values struct {
-		Indices  []string `json:"indices,omitempty"`
-		Repo     string   `json:"repo,omitempty"`
-		Snapshot string   `json:"snapshot,omitempty"`
-		Index    string   `json:"index,omitempty"`
+		Indices   []string `json:"indices,omitempty"`
+		Repo      string   `json:"repo,omitempty"`
+		OrderDir  string   `json:"odir,omitempty"`
+		OrderType string   `json:"otype,omitempty"`
+		Snapshot  string   `json:"snapshot,omitempty"`
+		Index     string   `json:"index,omitempty"`
 	} `json:"values,omitempty"`
 }
 
@@ -96,6 +100,13 @@ type IndexInSnap struct {
 	Name   string
 	Size   int
 	Shards []int
+}
+
+type snapList []struct {
+	Id          string `json:"id,omitempty"`
+	Status      string `json:"status,omitempty"`
+	End_epoch   string `json:"end_epoch,omitempty"`
+	Start_epoch string `json:"start_epoch,omitempty"`
 }
 
 type IndicesInSnap map[string]*IndexInSnap
@@ -230,13 +241,82 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
 				return
 			}
+
 			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/snapshots/" + request.Values.Repo + "?format=json")
 			if err != nil {
 				http.Error(w, err.Error(), 500)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
 				return
 			}
-			w.Write(response)
+			var snap_list snapList
+			_ = json.Unmarshal(response, &snap_list)
+
+			if request.Values.OrderType == "time" {
+
+				if request.Values.OrderDir == "asc" {
+					sort.Slice(snap_list[:], func(i, j int) bool {
+						return snap_list[i].End_epoch < snap_list[j].End_epoch
+					})
+				} else {
+					sort.Slice(snap_list[:], func(i, j int) bool {
+						return snap_list[i].End_epoch > snap_list[j].End_epoch
+					})
+				}
+
+			} else if request.Values.OrderType == "name" {
+
+				if request.Values.OrderDir == "asc" {
+					sort.Slice(snap_list[:], func(i, j int) bool {
+						return snap_list[i].Id < snap_list[j].Id
+					})
+
+				} else {
+					sort.Slice(snap_list[:], func(i, j int) bool {
+						return snap_list[i].Id > snap_list[j].Id
+					})
+				}
+
+			}
+			rt.sl = snap_list
+			j, _ := json.Marshal(snap_list)
+
+			w.Write(j)
+		}
+
+	case "get_snapshots_sorted":
+		{
+			if request.Values.OrderType == "time" {
+
+				if request.Values.OrderDir == "asc" {
+					sort.Slice(rt.sl[:], func(i, j int) bool {
+						return rt.sl[i].End_epoch < rt.sl[j].End_epoch
+					})
+				} else {
+					sort.Slice(rt.sl[:], func(i, j int) bool {
+						return rt.sl[i].End_epoch > rt.sl[j].End_epoch
+					})
+				}
+
+			} else if request.Values.OrderType == "name" {
+
+				if request.Values.OrderDir == "asc" {
+					sort.Slice(rt.sl[:], func(i, j int) bool {
+						return rt.sl[i].Id < rt.sl[j].Id
+					})
+
+				} else {
+					sort.Slice(rt.sl[:], func(i, j int) bool {
+						return rt.sl[i].Id > rt.sl[j].Id
+					})
+				}
+
+			}
+
+			log.Println("Get Snapshots from cache")
+
+			j, _ := json.Marshal(rt.sl)
+
+			w.Write(j)
 		}
 
 	case "get_snapshot":

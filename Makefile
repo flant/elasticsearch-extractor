@@ -18,7 +18,7 @@ build:
 	cd front && go-bindata -pkg front -o ../modules/front/front.go ./...
 	cd ../
 #	go mod vendor
-	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -ldflags "-s -w -X main.vBuild=${BUILD}" -o build/$(GONAME) $(GOFILES)
+	@GOPATH=$(GOPATH) GOBIN=$(GOBIN) GOOS=$(GOOS) GOARCH=$(GOARCH) go build -mod=mod -ldflags "-s -w -X main.vBuild=${BUILD}" -o build/$(GONAME) $(GOFILES)
 	strip ./build/$(GONAME)
 
 run:
