@@ -425,18 +425,18 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			response, err := rt.doPost(rt.conf.Elastic.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req)
 			if err != nil {
-				msg := fmt.Sprintf("{\"error\":\"%s\"}", err)
+				msg := fmt.Sprintf(`{"error":"%s"}`, err)
 				http.Error(w, msg, 500)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", response)
 				return
 			}
 
 			if len(index_list_not_restore) > 0 {
-				msg := fmt.Sprintf("{\"message\":\"Indices '%v' will not be restored: Not enough space\", \"error\":1}", index_list_not_restore)
+				msg := fmt.Sprintf(`{"message":"Indices '%v' will not be restored: Not enough space", "error":1}`, index_list_not_restore)
 				w.Write([]byte(msg))
 			}
 
-			msg := fmt.Sprintf("{\"message\":\"Indices '%v' will be restored\", \"error\":0}", index_list_for_restore)
+			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)
 			w.Write([]byte(msg))
 
 		}
