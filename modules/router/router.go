@@ -123,7 +123,7 @@ func Run(cnf config.Config) {
 
 	http.HandleFunc("/", rt.FrontHandler)
 	http.HandleFunc("/api/", rt.ApiHandler)
-	http.ListenAndServe("0.0.0.0:"+cnf.App.Port, nil)
+	http.ListenAndServe(cnf.App.Bind+":"+cnf.App.Port, nil)
 }
 
 // web-ui
@@ -136,7 +136,9 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	cFile := strings.Replace(file, "/", "", 1)
 	data, err := front.Asset(cFile)
 	if err != nil {
-		log.Println(err)
+		http.Error(w, err.Error(), 404)
+		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
+		return
 	}
 
 	log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", r.UserAgent())
@@ -166,38 +168,34 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodPost {
-		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
-		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusServiceUnavailable, "\t", "Invalid request method ", "\t", r.UserAgent())
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusMethodNotAllowed, "\t", "Invalid request method ")
 		return
 	}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		http.Error(w, err.Error(), 500)
-		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusInternalServerError, "\t", err.Error())
 		return
 	}
-
-	log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 200, "\t", r.UserAgent())
 
 	switch request.Action {
 	case "get_repositories":
 		{
 			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/repositories?format=json")
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 			w.Write(response)
 		}
 	case "get_nodes":
 		{
-
 			nresp, err := rt.getNodes()
-
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 
@@ -207,11 +205,10 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "get_indices":
 		{
-			//response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/indices/restored*?s=i&format=json")
 			response, err := rt.doGet(rt.conf.Elastic.Host + "extracted*/_recovery/")
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 
@@ -221,14 +218,15 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	case "del_index":
 		{
 			if request.Values.Index == "" {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				msg := `{"error":"Required parameter INDEX is missed"}`
+				http.Error(w, msg, http.StatusBadRequest)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 			response, err := rt.doDel(rt.conf.Elastic.Host + request.Values.Index)
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 
@@ -238,32 +236,28 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	case "get_snapshots":
 		{
 			if request.Values.Repo == "" {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				msg := `{"error":"Required parameter REPONAME is missed"}`
+				http.Error(w, msg, http.StatusBadRequest)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/snapshots/" + request.Values.Repo + "?format=json")
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 
 			var snap_list snapList
-			_ = json.Unmarshal(response, &snap_list)
+			err = json.Unmarshal(response, &snap_list)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
 
 			if !rt.conf.Elastic.Include {
-				/*for i := 0; i < (len(snap_list_pre) - 1); i++ {
-					matched, err := regexp.MatchString(`^[\.]\S+`, snap_list_pre[i].Id)
-					if err != nil {
-						log.Println("Regex error for ", snap_list_pre[i].Id)
-					}
-					if matched {
-						snap_list = remove(snap_list_pre, i)
-					}
-				}*/
-
 				j := 0
 				for _, n := range snap_list {
 					matched, err := regexp.MatchString(`^[\.]\S+`, n.Id)
@@ -351,21 +345,23 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 		{
 
 			if request.Values.Repo == "" {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				msg := `{"error":"Required parameter REPONAME is missed"}`
+				http.Error(w, msg, http.StatusBadRequest)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			if request.Values.Snapshot == "" {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				msg := `{"error":"Required parameter SNAPSHOT is missed"}`
+				http.Error(w, msg, http.StatusBadRequest)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			status_response, err := rt.doGet(rt.conf.Elastic.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 			w.Write(status_response)
@@ -375,25 +371,32 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 		{
 
 			if request.Values.Repo == "" {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				msg := `{"error":"Required parameter REPONAME is missed"}`
+				http.Error(w, msg, http.StatusBadRequest)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			if request.Values.Snapshot == "" {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				msg := `{"error":"Required parameter SNAPSHOT is missed"}`
+				http.Error(w, msg, http.StatusBadRequest)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			status_response, err := rt.doGet(rt.conf.Elastic.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
 			if err != nil {
-				http.Error(w, err.Error(), 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", r.UserAgent())
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
 			var snap_status snapStatus
-			_ = json.Unmarshal(status_response, &snap_status)
+			err = json.Unmarshal(status_response, &snap_status)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
 
 			indices := make(IndicesInSnap)
 
@@ -424,7 +427,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				msg := fmt.Sprintf("{\"error\":\"%s\"}", err)
 				http.Error(w, msg, 500)
-				//http.Error(w, err.Error(), 500)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", response)
 				return
 			}
@@ -442,71 +444,10 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	default:
 		{
 			http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
-			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusServiceUnavailable, "\t", "Invalid request method ", "\t", r.UserAgent())
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusServiceUnavailable, "\t", "Invalid request method ")
 			return
 
 		}
 
 	}
-}
-
-func (rt *Router) Barrel(array IndicesInSnap) ([]string, []string) {
-	var (
-		k  int
-		Sk int
-		a  []string
-		b  []string
-	)
-
-	for name, ind := range array {
-		for n := range rt.nodes.list {
-			for m := range ind.Shards {
-				k = rt.nodes.list[n] / ind.Shards[m]
-				Sk = Sk + k
-			}
-		}
-
-		if Sk > len(ind.Shards) {
-			a = append(a, name)
-		} else {
-			b = append(b, name)
-		}
-	}
-	return a, b
-}
-
-func (rt *Router) getNodes() ([]singleNode, error) {
-
-	var nresp []singleNode
-	var na nodesArray
-
-	//	rt.nodes.RLock()
-	//	defer rt.nodes.RUnlock()
-
-	response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name")
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(response, &nresp)
-	if err != nil {
-		return nil, err
-	}
-	s := 0
-	for i, n := range nresp {
-		nresp[i].Dt = fmt.Sprintf("%dGb", helpers.Atoi(n.Dt)/(1024*1024*1024))
-		na.list = append(na.list, helpers.Atoi(n.D))
-		s += helpers.Atoi(n.D)
-	}
-	na.sum = s
-	na.max = helpers.GetMaxValueInArray(na.list)
-	rt.nodes = na
-	return nresp, nil
-
-}
-
-func remove(s snapList, i int) snapList {
-	s[i] = s[len(s)-1]
-	// We do not need to put s[i] at the end, as it will be discarded anyway
-	return s[:len(s)-1]
 }

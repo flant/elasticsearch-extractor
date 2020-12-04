@@ -1,11 +1,12 @@
 app:
   port: 9400
+  bind: 0.0.0.0
   timeout: 60
 elastic:
   host: http://elasticsearch:9200/
 # use this fields if elastic requires BA
-#  username: elastic
-#  password: elastic
+  username: elastic
+  password: elastic
   ssl: false
 # Видим-ли в списке снапшотов системые (.kibana* / .opendistro* )
 # значение по умолчанию = false, то-есть не видим

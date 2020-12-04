@@ -17,6 +17,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -24,6 +25,8 @@ import (
 	"net"
 
 	"time"
+
+	"github.com/uzhinskiy/lib.go/helpers"
 )
 
 type esError struct {
@@ -143,4 +146,59 @@ func (rt *Router) doPost(url string, request map[string]interface{}) ([]byte, er
 	}
 
 	return body, nil
+}
+
+func (rt *Router) getNodes() ([]singleNode, error) {
+
+	var nresp []singleNode
+	var na nodesArray
+
+	//	rt.nodes.RLock()
+	//	defer rt.nodes.RUnlock()
+
+	response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name")
+	if err != nil {
+		return nil, err
+	}
+
+	err = json.Unmarshal(response, &nresp)
+	if err != nil {
+		return nil, err
+	}
+	s := 0
+	for i, n := range nresp {
+		nresp[i].Dt = fmt.Sprintf("%dGb", helpers.Atoi(n.Dt)/(1024*1024*1024))
+		na.list = append(na.list, helpers.Atoi(n.D))
+		s += helpers.Atoi(n.D)
+	}
+	na.sum = s
+	na.max = helpers.GetMaxValueInArray(na.list)
+	rt.nodes = na
+	return nresp, nil
+
+}
+
+func (rt *Router) Barrel(array IndicesInSnap) ([]string, []string) {
+	var (
+		k  int
+		Sk int
+		a  []string
+		b  []string
+	)
+
+	for name, ind := range array {
+		for n := range rt.nodes.list {
+			for m := range ind.Shards {
+				k = rt.nodes.list[n] / ind.Shards[m]
+				Sk = Sk + k
+			}
+		}
+
+		if Sk > len(ind.Shards) {
+			a = append(a, name)
+		} else {
+			b = append(b, name)
+		}
+	}
+	return a, b
 }
