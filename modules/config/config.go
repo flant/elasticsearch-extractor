@@ -15,14 +15,17 @@ package config
 
 import (
 	"io/ioutil"
+	"log"
 
 	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
 	App struct {
-		Port    string `yaml:"port"`
-		TimeOut int    `yaml:"timeout"`
+		Port       string `yaml:"port"`
+		Bind       string `yaml:"bind"`
+		TimeOut    int    `yaml:"-"`
+		TimeOutRaw *int   `yaml:"timeout"`
 	} `yaml:"app"`
 	Elastic struct {
 		Host     string `yaml:"host`
@@ -36,22 +39,27 @@ type Config struct {
 
 func Parse(f string) Config {
 	var c Config
-	yamlFile, err := ioutil.ReadFile(f)
+	yamlBytes, err := ioutil.ReadFile(f)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
-	err = yaml.Unmarshal(yamlFile, &c)
+	err = yaml.Unmarshal(yamlBytes, &c)
 	if err != nil {
-		panic(err)
+		log.Panic(err)
 	}
 
 	if c.App.Port == "" {
 		c.App.Port = "9400"
 	}
 
-	if c.App.TimeOut == 0 {
-		c.App.TimeOut = 30
+	if c.App.Bind == "" {
+		c.App.Bind = "0.0.0.0"
+	}
+
+	c.App.TimeOut = 30
+	if c.App.TimeOutRaw != nil {
+		c.App.TimeOut = *c.App.TimeOutRaw
 	}
 
 	if c.Elastic.Host == "" {
