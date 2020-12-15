@@ -218,7 +218,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	case "del_index":
 		{
 			if request.Values.Index == "" {
-				msg := `{"error":"Required parameter INDEX is missed"}`
+				msg := `{"error":"Required parameter Values.Index is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
@@ -236,7 +236,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	case "get_snapshots":
 		{
 			if request.Values.Repo == "" {
-				msg := `{"error":"Required parameter REPONAME is missed"}`
+				msg := `{"error":"Required parameter Values.Repo is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
@@ -345,14 +345,14 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 		{
 
 			if request.Values.Repo == "" {
-				msg := `{"error":"Required parameter REPONAME is missed"}`
+				msg := `{"error":"Required parameter Values.Repo is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			if request.Values.Snapshot == "" {
-				msg := `{"error":"Required parameter SNAPSHOT is missed"}`
+				msg := `{"error":"Required parameter Values.Snapshot is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
@@ -371,14 +371,14 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 		{
 
 			if request.Values.Repo == "" {
-				msg := `{"error":"Required parameter REPONAME is missed"}`
+				msg := `{"error":"Required parameter Values.Repo is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
 
 			if request.Values.Snapshot == "" {
-				msg := `{"error":"Required parameter SNAPSHOT is missed"}`
+				msg := `{"error":"Required parameter Values.Snapshot is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return

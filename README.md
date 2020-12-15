@@ -7,6 +7,7 @@ It requires Elasticsearch v7.0 or greater.
 To build & install elasticsearch-extractor on Linux (with systemd), please use the following commands:
 
 ```
+$ go get -u github.com/jteeuwen/go-bindata/...
 $ git clone https://github.com/flant/elasticsearch-extractor.git
 $ cd elasticsearch-extractor
 $ make

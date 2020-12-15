@@ -41,12 +41,12 @@ func Parse(f string) Config {
 	var c Config
 	yamlBytes, err := ioutil.ReadFile(f)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	err = yaml.Unmarshal(yamlBytes, &c)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	if c.App.Port == "" {
