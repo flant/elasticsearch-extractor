@@ -18,4 +18,4 @@ services:
     expose:
       - "9400"
     volumes:
-      - ./main.yml:/app/main.yml
+      - ./examples/main.yml:/app/main.yml

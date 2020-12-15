@@ -12,8 +12,8 @@ $ git clone https://github.com/flant/elasticsearch-extractor.git
 $ cd elasticsearch-extractor
 $ make
 $ sudo cp ./build/elasticsearch-extractor /usr/local/sbin/extractor
-$ sudo cp main.yml /usr/local/etc/extractor.yml
-$ sudo cp ./scripts/extractor.service /etc/systemd/system/
+$ sudo cp ./examples/main.yml /usr/local/etc/extractor.yml
+$ sudo cp ./examples/extractor.service /etc/systemd/system/
 $ vim /usr/local/etc/extractor.yml # config is small and self-descriptive
 $ sudo systemctl daemon-reload && systemctl start extractor
 $ sudo systemctl enable extractor

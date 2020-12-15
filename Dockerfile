@@ -17,7 +17,7 @@ LABEL maintainer="Uzhinskiy Boris <boris.uzhinsky@flant.com>"
 EXPOSE 9400/tcp
 
 COPY --from=builder /go/src/extractor/build/ /app
-COPY --from=builder /go/src/extractor/main.yml /app/main.yml
+COPY --from=builder /go/src/extractor/examples/main.yml /app/main.yml
 
 ENTRYPOINT [ "/app/extractor" ]
 CMD [ "-config", "/app/main.yml" ]
