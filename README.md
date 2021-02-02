@@ -4,6 +4,8 @@ It requires Elasticsearch v7.0 or greater.
 
 # Motivation / idea
 
+*[This announcement](https://blog.flant.com/announcing-elasticsearch-extractor-open-source-tool/) of the project (Jan'21) sheds some light on why elasticsearch-extractor has emerged.*
+
 We deal with lots of logs stored in Elasticsearch clusters. They are regularly archived into snapshots and stored in S3. Being available in snapshots for a long period, these logs are quite often needed by engineers (to be examined for different reasons). That's why we want to have a simple interface for getting these logs from snapshots.
 
 While we really like [Cerebro](https://github.com/lmenezes/cerebro/), it gives you *too much* power over Elasticsearch clusters and doesn't allow you to control permissions for its users. Here's how we've ended up with creating a much simpler tool that implements the only function: to extract an index from Elasticsearch snapshot.
