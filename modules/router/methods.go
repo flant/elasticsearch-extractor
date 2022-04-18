@@ -42,7 +42,7 @@ type esError struct {
 
 func (rt *Router) netClientPrepare() {
 	tlsClientConfig := createTLSConfig(rt.conf.Elastic.CAcert, rt.conf.Elastic.ClientCert,
-		rt.conf.Elastic.ClientKey, rt.conf.Elastic.SSL)
+		rt.conf.Elastic.ClientKey, rt.conf.Elastic.InsecureSkipVerify)
 	var netTransport = &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: time.Duration(rt.conf.App.TimeOut) * time.Second,
