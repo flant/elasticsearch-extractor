@@ -28,12 +28,14 @@ type Config struct {
 		TimeOutRaw *int   `yaml:"timeout"`
 	} `yaml:"app"`
 	Elastic struct {
-		Host     string `yaml:"host`
-		SSL      bool   `yaml:"ssl"`
-		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-		Cert     string `yaml:"certfile"`
-		Include  bool   `yaml:"include_system"`
+		Host       string `yaml:"host"`
+		SSL        bool   `yaml:"ssl"`
+		Username   string `yaml:"username"`
+		Password   string `yaml:"password"`
+		CAcert     string `yaml:"ca_cert"`
+		ClientCert string `yaml:"client_cert"`
+		ClientKey  string `yaml:"client_key"`
+		Include    bool   `yaml:"include_system"`
 	} `yaml:"elastic"`
 }
 
@@ -41,12 +43,12 @@ func Parse(f string) Config {
 	var c Config
 	yamlBytes, err := ioutil.ReadFile(f)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	err = yaml.Unmarshal(yamlBytes, &c)
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	if c.App.Port == "" {
