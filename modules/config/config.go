@@ -28,12 +28,15 @@ type Config struct {
 		TimeOutRaw *int   `yaml:"timeout"`
 	} `yaml:"app"`
 	Elastic struct {
-		Host     string `yaml:"host`
-		SSL      bool   `yaml:"ssl"`
-		Username string `yaml:"username"`
-		Password string `yaml:"password"`
-		Cert     string `yaml:"certfile"`
-		Include  bool   `yaml:"include_system"`
+		Host               string `yaml:"host"`
+		SSL                bool   `yaml:"ssl"`
+		Username           string `yaml:"username"`
+		Password           string `yaml:"password"`
+		CAcert             string `yaml:"ca_cert"`
+		ClientCert         string `yaml:"client_cert"`
+		ClientKey          string `yaml:"client_key"`
+		InsecureSkipVerify bool   `yaml:"insecure"`
+		Include            bool   `yaml:"include_system"`
 	} `yaml:"elastic"`
 }
 
