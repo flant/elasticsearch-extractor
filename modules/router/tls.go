@@ -35,17 +35,12 @@ func createTLSConfig(pemFile, pemCertFile, pemPrivateKeyFile string, insecureSki
 		tlsConfig.RootCAs = rootCerts
 	}
 	if len(pemCertFile) > 0 && len(pemPrivateKeyFile) > 0 {
-		// Load files once to catch configuration error early.
-		_, err := loadPrivateKeyFrom(pemCertFile, pemPrivateKeyFile)
+		certs, err := tls.LoadX509KeyPair(pemCertFile, pemPrivateKeyFile)
 		if err != nil {
 			log.Fatalf("Couldn't setup client authentication. Got %s.", err)
 			return nil
 		}
-		// Define a function to load certificate and key lazily at TLS handshake to
-		// ensure that the latest files are used in case they have been rotated.
-		tlsConfig.GetClientCertificate = func(*tls.CertificateRequestInfo) (*tls.Certificate, error) {
-			return loadPrivateKeyFrom(pemCertFile, pemPrivateKeyFile)
-		}
+		tlsConfig.Certificates = []tls.Certificate{certs}
 	}
 	return &tlsConfig
 }
