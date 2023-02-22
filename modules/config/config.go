@@ -24,6 +24,7 @@ type Config struct {
 	App struct {
 		Port       string `yaml:"port"`
 		Bind       string `yaml:"bind"`
+		Kibana     string `yaml:"kibana"`
 		TimeOut    int    `yaml:"-"`
 		TimeOutRaw *int   `yaml:"timeout"`
 	} `yaml:"app"`

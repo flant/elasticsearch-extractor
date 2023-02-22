@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"text/template"
 
 	"time"
 
@@ -147,7 +148,12 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("X-Server", version.Version)
-	w.Write(data)
+	if strings.Contains(file, ".html") {
+		t := template.Must(template.New("index").Parse(string(data)))
+		t.Execute(w, rt.conf.App.Kibana)
+	} else {
+		w.Write(data)
+	}
 }
 
 func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {

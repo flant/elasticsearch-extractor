@@ -2,12 +2,14 @@ app:
   port: 9400
   bind: 0.0.0.0
   timeout: 60
+  kibana: http://kibana.host
 elastic:
-  host: http://elasticsearch:9200/
+  host: https://localhost:9200/
 # use this fields if elastic requires BA
-#  username: elastic
-#  password: elastic
+  username: admin
+  password: admin
   ssl: false
+  insecure: true
 # Видим-ли в списке снапшотов системые (.kibana* / .opendistro* )
 # значение по умолчанию = false, то-есть не видим
   include_system: false
