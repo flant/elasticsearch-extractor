@@ -42,6 +42,7 @@ func createTLSConfig(pemFile, pemCertFile, pemPrivateKeyFile string, insecureSki
 		}
 		tlsConfig.Certificates = []tls.Certificate{certs}
 	}
+
 	return &tlsConfig
 }
 
