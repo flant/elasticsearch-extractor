@@ -418,6 +418,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Elastic.IsS3)
+			log.Printf("%#v\n%#v\n", index_list_for_restore, index_list_not_restore)
 			t := time.Now()
 			req := map[string]interface{}{
 				"ignore_unavailable":   false,
