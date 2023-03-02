@@ -38,6 +38,7 @@ type Config struct {
 		ClientKey          string `yaml:"client_key"`
 		InsecureSkipVerify bool   `yaml:"insecure"`
 		Include            bool   `yaml:"include_system"`
+		IsS3               bool   `yaml:"is_s3"`
 	} `yaml:"elastic"`
 }
 

@@ -417,7 +417,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			index_list_for_restore, index_list_not_restore := rt.Barrel(indices)
+			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Elastic.IsS3)
 			t := time.Now()
 			req := map[string]interface{}{
 				"ignore_unavailable":   false,
@@ -440,6 +440,20 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			if len(index_list_not_restore) > 0 {
 				msg := fmt.Sprintf(`{"message":"Indices '%v' will not be restored: Not enough space", "error":1}`, index_list_not_restore)
 				w.Write([]byte(msg))
+			}
+
+			ip_req := map[string]interface{}{
+				"type": "index-pattern",
+				"index-pattern": map[string]interface{}{
+					"title":         "extracted*",
+					"timeFieldName": "timestamp"}}
+
+			ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:123", ip_req)
+			if err != nil {
+				msg := fmt.Sprintf(`{"error":"%s"}`, err)
+				http.Error(w, msg, 500)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", ip_resp)
+				return
 			}
 
 			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)

@@ -179,7 +179,7 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 
 }
 
-func (rt *Router) Barrel(array IndicesInSnap) ([]string, []string) {
+func (rt *Router) Barrel(ind_array IndicesInSnap, s3 bool) ([]string, []string) {
 	var (
 		k  int
 		Sk int
@@ -187,18 +187,22 @@ func (rt *Router) Barrel(array IndicesInSnap) ([]string, []string) {
 		b  []string
 	)
 
-	for name, ind := range array {
-		for n := range rt.nodes.list {
-			for m := range ind.Shards {
-				k = rt.nodes.list[n] / ind.Shards[m]
-				Sk = Sk + k
+	for name, ind := range ind_array {
+		if !s3 {
+			for n := range rt.nodes.list {
+				for m := range ind.Shards {
+					k = rt.nodes.list[n] / ind.Shards[m]
+					Sk = Sk + k
+				}
 			}
-		}
 
-		if Sk > len(ind.Shards) {
-			a = append(a, name)
+			if Sk > len(ind.Shards) {
+				a = append(a, name)
+			} else {
+				b = append(b, name)
+			}
 		} else {
-			b = append(b, name)
+			a = append(a, name)
 		}
 	}
 	return a, b
