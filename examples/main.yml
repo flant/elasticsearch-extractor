@@ -10,6 +10,7 @@ elastic:
   password: admin
   ssl: false
   insecure: true
+  is_s3: true
 # Видим-ли в списке снапшотов системые (.kibana* / .opendistro* )
 # значение по умолчанию = false, то-есть не видим
   include_system: false
