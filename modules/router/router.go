@@ -418,7 +418,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Elastic.IsS3)
-			log.Printf("%#v\n%#v\n", index_list_for_restore, index_list_not_restore)
 			t := time.Now()
 			req := map[string]interface{}{
 				"ignore_unavailable":   false,
@@ -443,18 +442,35 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(msg))
 			}
 
-			ip_req := map[string]interface{}{
-				"type": "index-pattern",
-				"index-pattern": map[string]interface{}{
-					"title":         "extracted*",
-					"timeFieldName": "timestamp"}}
+			for _, iname := range index_list_for_restore {
+				if strings.Contains(iname, "v3") {
+					ip_req := map[string]interface{}{
+						"type": "index-pattern",
+						"index-pattern": map[string]interface{}{
+							"title":         "extracted_v3-*",
+							"timeFieldName": "timestamp"}}
 
-			ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:123", ip_req)
-			if err != nil {
-				msg := fmt.Sprintf(`{"error":"%s"}`, err)
-				http.Error(w, msg, 500)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", 500, "\t", err.Error(), "\t", ip_resp)
-				return
+					ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:v3-080", ip_req)
+					if err != nil {
+						msg := fmt.Sprintf(`{"error":"%s"}`, err)
+						http.Error(w, msg, 500)
+						log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\tcreate index-pattern\t", 500, "\t", err.Error(), "\t", ip_resp)
+					}
+				} else {
+					ip_req := map[string]interface{}{
+						"type": "index-pattern",
+						"index-pattern": map[string]interface{}{
+							"title":         "extracted_*",
+							"timeFieldName": "@timestamp"}}
+
+					ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:080", ip_req)
+					if err != nil {
+						msg := fmt.Sprintf(`{"error":"%s"}`, err)
+						http.Error(w, msg, 500)
+						log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\tcreate index-pattern\t", 500, "\t", err.Error(), "\t", ip_resp)
+					}
+
+				}
 			}
 
 			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)
