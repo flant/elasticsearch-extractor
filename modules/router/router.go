@@ -104,6 +104,15 @@ type IndexInSnap struct {
 	Shards []int
 }
 
+type indexGroup struct {
+	Index string `json:"index,omitempty"`
+}
+
+type Cluster struct {
+	Name string
+	Host string
+}
+
 type snapList []struct {
 	Id          string `json:"id,omitempty"`
 	Status      string `json:"status,omitempty"`
@@ -188,7 +197,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	switch request.Action {
 	case "get_repositories":
 		{
-			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/repositories?format=json")
+			response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/repositories?format=json")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -211,7 +220,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "get_indices":
 		{
-			response, err := rt.doGet(rt.conf.Elastic.Host + "extracted*/_recovery/")
+			response, err := rt.doGet(rt.conf.Snapshot.Host + "extracted*/_recovery/")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -229,7 +238,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
-			response, err := rt.doDel(rt.conf.Elastic.Host + request.Values.Index)
+			response, err := rt.doDel(rt.conf.Snapshot.Host + request.Values.Index)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -248,7 +257,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/snapshots/" + request.Values.Repo + "?format=json")
+			response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/snapshots/" + request.Values.Repo + "?format=json")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -263,7 +272,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			if !rt.conf.Elastic.Include {
+			if !rt.conf.Snapshot.Include {
 				j := 0
 				for _, n := range snap_list {
 					matched, err := regexp.MatchString(`^[\.]\S+`, n.Id)
@@ -364,7 +373,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			status_response, err := rt.doGet(rt.conf.Elastic.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
+			status_response, err := rt.doGet(rt.conf.Snapshot.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -390,7 +399,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			status_response, err := rt.doGet(rt.conf.Elastic.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
+			status_response, err := rt.doGet(rt.conf.Snapshot.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -417,7 +426,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Elastic.IsS3)
+			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Snapshot.IsS3)
 			t := time.Now()
 			req := map[string]interface{}{
 				"ignore_unavailable":   false,
@@ -429,7 +438,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				"index_settings":       map[string]interface{}{"index.number_of_replicas": 0},
 			}
 
-			response, err := rt.doPost(rt.conf.Elastic.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req)
+			response, err := rt.doPost(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req)
 			if err != nil {
 				msg := fmt.Sprintf(`{"error":"%s"}`, err)
 				http.Error(w, msg, 500)
@@ -450,7 +459,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							"title":         "extracted_v3-*",
 							"timeFieldName": "timestamp"}}
 
-					ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:v3-080", ip_req)
+					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:v3-080", ip_req)
 					if err != nil {
 						msg := fmt.Sprintf(`{"error":"%s"}`, err)
 						http.Error(w, msg, 500)
@@ -463,7 +472,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							"title":         "extracted_*",
 							"timeFieldName": "@timestamp"}}
 
-					ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:080", ip_req)
+					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:080", ip_req)
 					if err != nil {
 						msg := fmt.Sprintf(`{"error":"%s"}`, err)
 						http.Error(w, msg, 500)
@@ -476,6 +485,27 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)
 			w.Write([]byte(msg))
 
+		}
+		/*  ---- search --- */
+	case "get_index_groups":
+		{
+			response, err := rt.getIndexGroups()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			j, _ := json.Marshal(response)
+			w.Write(j)
+		}
+
+	case "get_clusters":
+		{
+			var cl []Cluster
+			cl = append(cl, Cluster{rt.conf.Snapshot.Name, rt.conf.Snapshot.Host})
+			cl = append(cl, Cluster{rt.conf.Search.Name, rt.conf.Search.Host})
+			j, _ := json.Marshal(cl)
+			w.Write(j)
 		}
 
 	default:

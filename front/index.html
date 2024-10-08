@@ -16,113 +16,111 @@ body {
 <body>
 <header>
 <nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
-  <a class="navbar-brand" href="#">X-tractor</a>
+    <a class="navbar-brand" href="#">X-tractor</a>
     <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
-    <div class="collapse navbar-collapse" id="navbarCollapse">
+  <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+    <div class="navbar-nav">
+      <a class="nav-link active" href="#">Snapshots <span class="sr-only">(current)</span></a>
+      <a class="nav-link" href="/search.html#">Searches</a>
     </div>
 </nav>
-</header>
-
   <!-- Page Content -->
   <div class="container-fluid">
     <div class="row">
       <!-- Blog Entries Column -->
 
+            <!-- Sidebar Widgets Column -->
+            <div class="col-md-2">
+              <!-- Side Widget -->
+              <div class="card my-4">
+                <h5 class="card-header">Repositories</h5>
+                <div class="card-body">
+                  <ul class="list-unstyled list-group mb-0" id="repolist"> </ul>
+                </div>
+              </div>
 
-      <!-- Sidebar Widgets Column -->
-      <div class="col-md-2">
-        <!-- Side Widget -->
-        <div class="card my-4">
-          <h5 class="card-header">Repositories</h5>
-          <div class="card-body">
-            <ul class="list-unstyled list-group mb-0" id="repolist"> </ul>
+              <div class="card my-4">
+                <h5 class="card-header">Results</h5>
+                <div class="card-body" id="result">
+                </div>
+              </div>
+
+              <!-- Categories Widget -->
+              <div class="card my-4">
+                <h5 class="card-header">Nodes</h5>
+                <div class="card-body">
+                  <ul class="list-unstyled mb-0" id="nodelist"> </ul>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+
+              <h1 class="my-4">Snapshots list
+                <small id="selectedsnap"></small>
+              </h1>
+              <small  class="text-monospace">Attention! The <strong>SNAPSHOT-2020.05.06</strong> contains the index for the <strong>previous</strong> day.</small>
+              
+              <ul class="nav justify-content-end">
+                <li class="nav-item">
+                  <a class="nav-link" href="#" id="get_repo_sort_name" data-otype="name" data-odir="asc">Sort by Name</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" href="#" id="get_repo_sort_time" data-otype="time" data-odir="asc">Sort by Time</a>
+                </li>
+              </ul>        
+
+              <div class="d-flex align-items-center invisible" id="loading"><strong>Loading...</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>
+              <ul class="list-unstyled mb-0 overflow-auto" style="max-height: 800px;" id="snapshotlist"> </ul>
+
+            </div>       
+            
+            <!-- Sidebar Widgets Column -->
+            <div class="col-md-4">
+              <!-- Side Widget -->
+              <div class="card my-4">
+                <h5 class="card-header">Restored indices</h5>
+                <div class="card-body">
+                  <ul class="list-unstyled list-group mb-0" id="indlist"> </ul>
+                </div>
+                <div class="card-footer bg-warning">
+                  <small  class="text-monospace">Attention! The <strong>extracted_*</strong> indices will be deleted 48 hours after they were created.</small>
+                </div>        
+              </div>
+    </div><!-- /.row -->
+  </div><!-- /.container -->
+
+      <div class="modal fade" tabindex="-1" id="update_instance" role="dialog">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="exampleModalLabel">X-tract indices from snapshot</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <form action="/api/" role="form" class="form-horizontal" method="POST" id="update_form">
+            <div class="modal-body">
+              <input type="hidden" name="action" value="restore">
+              <input type="hidden" name="snapshot" id="r_snapshot">
+              <input type="hidden" name="repo" id="r_repo">
+                <div class="form-group">
+                  <label for="exampleFormControlSelect2">Indices in snapshot</label>
+                  <select multiple class="form-control" name="indices[]" id="indices">
+                  </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary" id="restore"  data-dismiss="modal">Restore</button>
+            </div>
           </div>
+          </form>
         </div>
 
-        <div class="card my-4">
-          <h5 class="card-header">Results</h5>
-          <div class="card-body" id="result">
-          </div>
-        </div>
-
-        <!-- Categories Widget -->
-        <div class="card my-4">
-          <h5 class="card-header">Nodes</h5>
-          <div class="card-body">
-            <ul class="list-unstyled mb-0" id="nodelist"> </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-6">
-
-        <h1 class="my-4">Snapshots list
-          <small id="selectedsnap"></small>
-        </h1>
-        <small  class="text-monospace">Attention! The <strong>SNAPSHOT-2020.05.06</strong> contains the index for the <strong>previous</strong> day.</small>
-        
-        <ul class="nav justify-content-end">
-          <li class="nav-item">
-            <a class="nav-link" href="#" id="get_repo_sort_name" data-otype="name" data-odir="asc">Sort by Name</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#" id="get_repo_sort_time" data-otype="time" data-odir="asc">Sort by Time</a>
-          </li>
-        </ul>        
-
-        <div class="d-flex align-items-center invisible" id="loading"><strong>Loading...</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>
-        <ul class="list-unstyled mb-0 overflow-auto" style="max-height: 800px;" id="snapshotlist"> </ul>
-
-      </div>       
-      
-      <!-- Sidebar Widgets Column -->
-      <div class="col-md-4">
-        <!-- Side Widget -->
-        <div class="card my-4">
-          <h5 class="card-header">Restored indices</h5>
-          <div class="card-body">
-            <ul class="list-unstyled list-group mb-0" id="indlist"> </ul>
-          </div>
-          <div class="card-footer bg-warning">
-            <small  class="text-monospace">Attention! The <strong>extracted_*</strong> indices will be deleted 48 hours after they were created.</small>
-          </div>        
-        </div>
-    </div>
-    <!-- /.row -->
-  </div>
-  <!-- /.container -->
-
-<div class="modal fade" tabindex="-1" id="update_instance" role="dialog">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="exampleModalLabel">X-tract indices from snapshot</h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <form action="/api/" role="form" class="form-horizontal" method="POST" id="update_form">
-      <div class="modal-body">
-        <input type="hidden" name="action" value="restore">
-        <input type="hidden" name="snapshot" id="r_snapshot">
-        <input type="hidden" name="repo" id="r_repo">
-          <div class="form-group">
-            <label for="exampleFormControlSelect2">Indices in snapshot</label>
-            <select multiple class="form-control" name="indices[]" id="indices">
-            </select>
-          </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-        <button type="button" class="btn btn-primary" id="restore"  data-dismiss="modal">Restore</button>
-      </div>
-    </div>
-    </form>
-  </div>
-
-</div><!-- /.modal -->
+      </div><!-- /.modal -->
 
 </body>
 
@@ -133,8 +131,8 @@ body {
 
 var kibana_url = "{{.}}"
 
-var getnodes = setInterval(NodeStatus, 5000);
-var getindices = setInterval(IndexList, 3000);
+//var getnodes = setInterval(NodeStatus, 5000);
+//var getindices = setInterval(IndexList, 3000);
 
 function bytesToSize(bytes) {
    var sizes = ['b', 'kb', 'mb', 'gb', 'tb'];

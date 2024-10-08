@@ -22,7 +22,7 @@ import (
 
 	"bytes"
 	"net"
-
+	"regexp"
 	"time"
 
 	"github.com/uzhinskiy/lib.go/helpers"
@@ -41,8 +41,8 @@ type esError struct {
 }
 
 func (rt *Router) netClientPrepare() {
-	tlsClientConfig := createTLSConfig(rt.conf.Elastic.CAcert, rt.conf.Elastic.ClientCert,
-		rt.conf.Elastic.ClientKey, rt.conf.Elastic.InsecureSkipVerify)
+	tlsClientConfig := createTLSConfig(rt.conf.Snapshot.CAcert, rt.conf.Snapshot.ClientCert,
+		rt.conf.Snapshot.ClientKey, rt.conf.Snapshot.InsecureSkipVerify)
 	var netTransport = &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: time.Duration(rt.conf.App.TimeOut) * time.Second,
@@ -59,8 +59,8 @@ func (rt *Router) netClientPrepare() {
 func (rt *Router) doDel(url string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("DELETE", url, nil)
-	if rt.conf.Elastic.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
+	if rt.conf.Snapshot.Username != "" {
+		actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
 	}
 
 	actionRequest.Header.Set("Content-Type", "application/json")
@@ -89,8 +89,8 @@ func (rt *Router) doDel(url string) ([]byte, error) {
 func (rt *Router) doGet(url string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("GET", url, nil)
-	if rt.conf.Elastic.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
+	if rt.conf.Snapshot.Username != "" {
+		actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
 	}
 
 	actionRequest.Header.Set("Content-Type", "application/json")
@@ -120,8 +120,8 @@ func (rt *Router) doPost(url string, request map[string]interface{}) ([]byte, er
 	toBackend, _ := json.Marshal(request)
 
 	actionRequest, _ := http.NewRequest("POST", url, bytes.NewReader(toBackend))
-	if rt.conf.Elastic.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
+	if rt.conf.Snapshot.Username != "" {
+		actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
 	}
 
 	actionRequest.Header.Set("Content-Type", "application/json")
@@ -157,7 +157,7 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 	//	rt.nodes.RLock()
 	//	defer rt.nodes.RUnlock()
 
-	response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name")
+	response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name")
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +176,32 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 	na.max = helpers.GetMaxValueInArray(na.list)
 	rt.nodes = na
 	return nresp, nil
+
+}
+
+func (rt *Router) getIndexGroups() ([]indexGroup, error) {
+	var igs, igresp []indexGroup
+
+	re := regexp.MustCompile(`^([\w\d\-_]+)-(\d{4}\.\d{2}\.\d{2}(-\d{2})*)`)
+
+	//	rt.nodes.RLock()
+	//	defer rt.nodes.RUnlock()
+	t := time.Now()
+	response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/indices/*-" + t.Format("2006.01.02") + "*,-.*/?format=json&h=index")
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(response, &igs)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range igs {
+		match := re.FindStringSubmatch(n.Index)
+		n.Index = match[1] + "-*"
+		igresp = append(igresp, n)
+	}
+
+	return igresp, nil
 
 }
 

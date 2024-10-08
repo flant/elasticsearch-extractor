@@ -20,6 +20,8 @@ import (
 
 	"github.com/flant/elasticsearch-extractor/modules/config"
 	"github.com/flant/elasticsearch-extractor/modules/router"
+
+	//"github.com/flant/elasticsearch-extractor/modules/search"
 	"github.com/flant/elasticsearch-extractor/modules/version"
 )
 

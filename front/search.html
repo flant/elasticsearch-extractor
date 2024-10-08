@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+<head>
+<title>Elasticsearch: restore snapshots</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+<link rel="stylesheet" href="/assets/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2" crossorigin="anonymous"> 
+
+<link href="/assets/css/docs.min.css" rel="stylesheet">
+
+<style>
+body {
+  padding-top: 56px;
+}
+
+</style>
+
+</head>
+<body>
+<header>
+<nav class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+    <a class="navbar-brand" href="#">X-tractor</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+  <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
+    <div class="navbar-nav">
+      <a class="nav-link" href="/#">Snapshots</span></a>
+      <a class="nav-link active" href="/search.html">Searches</a>
+    </div>
+</nav>
+  <!-- Page Content -->
+  <div class="container-fluid">
+    <div class="row flex-xl-nowrap">
+        <div class="col-md-3 col-xl-2 bd-sidebar">
+          <nav class="collapse bd-links" id="bd-docs-nav" aria-label="Main navigation">
+            <div class="bd-search" style="position: relative; display: inline-block; left: 50px; direction: ltr;">
+              <select class="form-control form-control-sm" id="clusters" style="width:90%">
+                <option selected value=-1>choose the cluster</option>
+              </select>
+
+              <select class="form-control form-control-sm" name="indices"  style="width:90%" id="igs">
+              </select>
+            </div>
+          </nav>
+        </div> <!-- /.left -->
+        <main class="col-md-9 col-xl-8 py-md-3 pl-md-5 bd-content" role="main">
+                  <form action="/api/" role="form" method="POST" id="update_form">
+                    <input type="hidden" name="action" value="search">
+                    <input type="hidden" name="idx" id="idx">
+                    <input type="hidden" name="cluster" id="cluster">
+                      <div class="input-group">
+                        <input id="xql" type="text" class="form-control form-control-sm">
+                        <input id="datetimepicker_start" type="text" class="form-control form-control-sm mx-sm-3 mb-2">
+                        <input id="datetimepicker_end" type="text" class="form-control form-control-sm mx-sm-3 mb-2">
+                        <button type="button" class="btn btn-primary btn-sm" id="search">Refresh</button>
+                      </div>
+                  </form>
+                  <div class="d-flex align-items-center invisible" id="loading"><strong>Loading...</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>
+                  <ul class="list-unstyled mb-0 overflow-auto" style="max-height: 800px;" id="result"> </ul>
+        </main><!-- /.main -->
+
+    </div><!-- /.row -->
+  </div><!-- /.container -->
+
+
+      <div class="modal fade" tabindex="-1" id="update_instance" role="dialog">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="exampleModalLabel">X-tract indices from snapshot</h5>
+              <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <span aria-hidden="true">&times;</span>
+              </button>
+            </div>
+            <form action="/api/" role="form" class="form-horizontal" method="POST" id="update_form">
+            <div class="modal-body">
+              <input type="hidden" name="action" value="restore">
+              <input type="hidden" name="snapshot" id="r_snapshot">
+              <input type="hidden" name="repo" id="r_repo">
+                <div class="form-group">
+                  <label for="exampleFormControlSelect2">Indices in snapshot</label>
+                  <select multiple class="form-control" name="indices[]" id="indices">
+                  </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+              <button type="button" class="btn btn-primary" id="restore"  data-dismiss="modal">Restore</button>
+            </div>
+          </div>
+          </form>
+        </div>
+
+      </div><!-- /.modal -->
+
+</body>
+<link rel="stylesheet" type="text/css" href="/assets/css/jquery.datetimepicker.min.css">
+<script src="/assets/js/jquery-3.5.1.min.js"></script>
+<script src="/assets/js/bootstrap.min.js"></script>
+<script src="/assets/js/jquery.datetimepicker.full.min.js"></script>
+
+<script>
+
+$.datetimepicker.setLocale('ru');
+$('#datetimepicker_start').datetimepicker({timepicker: true, format:'Y-m-d H:i:s', step: 15});
+$('#datetimepicker_end').datetimepicker({
+  timepicker: true, 
+  format:'Y-m-d H:i:s', 
+  step: 15,
+  onShow:function( ct ){
+   this.setOptions({
+    minDate:$('#datetimepicker_start').val()?$('#datetimepicker_start').val():false
+   })
+  }
+});
+//var getnodes = setInterval(NodeStatus, 5000);
+//var getindices = setInterval(IndexList, 3000);
+
+function bytesToSize(bytes) {
+   var sizes = ['b', 'kb', 'mb', 'gb', 'tb'];
+   if (bytes == 0) return '0 byte';
+   var i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)));
+   return Math.round(bytes / Math.pow(1024, i), 2) + ' ' + sizes[i];
+}
+
+$(document).ready(function(){
+    var post = {
+      "action": "get_clusters"
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        var str = "";
+        for(var k in data) {
+          name = data[k].Name;
+          host = data[k].Host;
+          $('#clusters').append(new Option(name, host,true,true));
+        }
+        $("#loading").addClass('invisible');
+    }
+  });
+});
+
+$('#clusters').on('change', function(e) {
+    var cluster = this.value;
+    if (cluster!=-1) {
+      var post = {
+        "action": "get_index_groups",
+        "values" : {
+          "cluster": cluster
+        }
+      };
+      $('#cluster').val(cluster);
+      $('#igs').find('option')
+      .remove()
+      .end();
+      $.ajax({
+        type: "POST",
+        url: "/api/",
+        data: JSON.stringify(post),
+        dataType: 'json',
+        contentType: 'application/json',
+        success: function (data) {
+          var str = "";
+          for(var k in data) {
+            index = data[k].index;
+            $('#igs').append(new Option(index, index,true,true));
+          }
+          $("#loading").addClass('invisible');
+      }
+    });
+  }
+});
+
+$("#search").click(function(){
+    var post = {
+      "action": "search",
+      "values" : {
+        "index": $('#igs').val(),
+        "cluster": $('#cluster').val(),
+        "xql": $('#xql').val(),
+        "date_start":$('#datetimepicker_start').val(),
+        "date_end":$('#datetimepicker_end').val(),
+      }
+    };
+    
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        if ( data.error == 0 ) {
+          $("#result").html('<div class="alert alert-success alert-dismissible fade show">'+data.message+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>');
+        } else {
+          $("#result").html('<div class="alert alert-danger alert-dismissible fade show">'+data.message+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+        }
+      },
+      error: function (data) {
+        $("#result").html('<div class="alert alert-danger alert-dismissible fade show">'+data.responseJSON.error+'<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button></div>')
+      }
+    });
+    event.preventDefault();
+});
+
+</script>
+
+</html>
