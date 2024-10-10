@@ -49,6 +49,11 @@ type apiRequest struct {
 		OrderType string   `json:"otype,omitempty"`
 		Snapshot  string   `json:"snapshot,omitempty"`
 		Index     string   `json:"index,omitempty"`
+		Cluster   string   `json:"cluster,omitempty"`
+		Xql       string   `json:"xql,omitempty"`
+		Fields    []string `json:"fields,omitempty"`
+		DateStart string   `json:"date_start,omitempty"`
+		DateEnd   string   `json:"date_end,omitempty"`
 	} `json:"values,omitempty"`
 }
 
@@ -108,6 +113,14 @@ type indexGroup struct {
 	Index string `json:"index,omitempty"`
 }
 
+type IndexMapping map[string]struct {
+	Mappings struct {
+		Properties map[string]struct {
+			Type string
+		}
+	}
+}
+
 type Cluster struct {
 	Name string
 	Host string
@@ -142,6 +155,9 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	remoteIP := helpers.GetIP(r.RemoteAddr, r.Header.Get("X-Real-IP"), r.Header.Get("X-Forwarded-For"))
 	if file == "/" {
 		file = "/index.html"
+	}
+	if file == "/search/" {
+		file = "/search.html"
 	}
 	cFile := strings.Replace(file, "/", "", 1)
 	data, err := front.Asset(cFile)
@@ -499,6 +515,31 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write(j)
 		}
 
+	case "get_mapping":
+		{
+			t := time.Now()
+			var m IndexMapping
+			response, err := rt.doGet(request.Values.Cluster + request.Values.Index + t.Format("2006.01.02") + "/_mapping")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			err = json.Unmarshal(response, &m)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			var j []byte
+			for _, v := range m {
+				j, _ = json.Marshal(v.Mappings.Properties)
+				break
+			}
+
+			w.Write(j)
+		}
+
 	case "get_clusters":
 		{
 			var cl []Cluster
@@ -506,6 +547,58 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			cl = append(cl, Cluster{rt.conf.Search.Name, rt.conf.Search.Host})
 			j, _ := json.Marshal(cl)
 			w.Write(j)
+		}
+
+	case "search":
+		{
+			/*
+				req := map[string]interface{}{
+					"sort":    map[string]interface{}{"@timestamp": "desc"},
+					"_source": false,
+					"size":    500,
+					"fields":  []string{"@timestamp", "audit_cluster_name", "audit_category"},
+					"query":   map[string]interface{}{"match_phrase": map[string]interface{}{"audit_cluster_name": "docker-cluster"}},
+				}
+			*/
+			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateStart+" (MSK)")
+			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateEnd+" (MSK)")
+
+			query := `{
+						"sort": [
+							{"timestamp": "desc"}
+						],
+						"_source": false,
+						"fields": [ "` + strings.Join(request.Values.Fields, "\", \"") + `" ],
+						  "query": {
+						    "bool": {
+						      "must": [],
+						      "filter": [
+						        {
+						          "range": {
+						            "timestamp": {
+						              "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
+						              "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
+						              "format": "strict_date_optional_time"
+						            }
+						          }
+						        }
+						      ],
+						      "should": [],
+						      "must_not": []
+						    }
+						  }
+						}`
+			log.Println(query)
+			var req map[string]interface{}
+			_ = json.Unmarshal([]byte(query), &req)
+			response, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			//j, _ := json.Marshal(response)
+			w.Write(response)
 		}
 
 	default:
