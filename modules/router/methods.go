@@ -233,3 +233,22 @@ func (rt *Router) Barrel(ind_array IndicesInSnap, s3 bool) ([]string, []string) 
 	}
 	return a, b
 }
+
+func (rt *Router) flattenMap(prefix string, nestedMap map[string]interface{}, flatMap map[string]string) {
+	for key, value := range nestedMap {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		if subMap, ok := value.(map[string]interface{}); ok {
+			if typeVal, exists := subMap["type"]; exists {
+				flatMap[fullKey] = typeVal.(string)
+			}
+
+			if props, hasProps := subMap["properties"]; hasProps {
+				rt.flattenMap(fullKey, props.(map[string]interface{}), flatMap)
+			}
+		}
+	}
+}

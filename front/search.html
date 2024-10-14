@@ -65,7 +65,7 @@ body {
               </div>
           </form>
           <div class="d-flex align-items-center invisible" id="loading"><strong>Loading...</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>
-          <ul class="list-unstyled mb-0 overflow-auto" style="max-height: 1024px;" id="result"> </ul>
+          <span class="mb-0 overflow-auto" style="max-height: 1024px;" id="result"> </span>
         </main><!-- /.main -->
 
     </div><!-- /.row -->
@@ -103,7 +103,6 @@ body {
       </div><!-- /.modal -->
 
 
-
 </body>
 <link rel="stylesheet" type="text/css" href="/assets/css/jquery.datetimepicker.min.css">
 <script src="/assets/js/jquery-3.5.1.min.js"></script>
@@ -112,6 +111,7 @@ body {
 
 <script>
 const date = new Date();
+var mapping = {}
 date.setMinutes(date.getMinutes() - 15)
 $.datetimepicker.setLocale('ru');
 $('#datetimepicker_start').datetimepicker({timepicker: true, format:'Y-m-d H:i:s', step: 15, value:date});
@@ -207,7 +207,7 @@ $('#igs').on('change', function(e) {
         success: function (data) {
           var str = "";
           for (var k in data) {
-            str += "<li class='list-group-item'>"+ k + "(" + data[k].Type + ")" +"&nbsp;<input type='checkbox' name='fields' data-type='" + data[k].Type + "' value='" + k + "'></li>";
+            str += "<li class='list-group-item'><input type='checkbox' name='fields' data-type='" + data[k] + "' value='" + k + "'>&nbsp;"+ k + "(" + data[k] + ")" +"</li>";
           }
           $("#fields").html(str);
           $("#loading").addClass('invisible');
@@ -218,11 +218,13 @@ $('#igs').on('change', function(e) {
 
 $("#search").click(function(){
     $("#loading").removeClass('invisible');
+    $("#result").html("");
     fields = []
     tf = []
     $("input[name='fields']").each(function() {
-      console.log(this)
-
+      if (this.dataset.type=="date") {
+        tf.push(this.value)
+      }
       if (this.checked) {
         fields.push(this.value)
       }
@@ -250,9 +252,42 @@ $("#search").click(function(){
       success: function (data) {
         res = data.hits.hits
         var str = "";
-        for (var k in res) {
-          
-          str += "<li>"+ res[k].fields +"</li>";
+
+        if ( res.length > 0 ) {
+          str = "<table  class='table'><thead><tr><th>Time</th>";
+            if ( fields.length == 0 ) {
+              str+="<th>_source</th>";
+            } else {
+              for (var f in res[0].fields) {
+                  if (f==tf[0]) {
+                    continue;
+                  } else {
+                    str+="<th>" + f + "</th>";
+                  }
+                  
+              }
+            }
+          str+="</tr></thead><tbody>";
+          for (var k in res) {
+            str += "<tr>";
+            if ( fields.length == 0 ) {
+              str += "<td>"+ res[k]._source[tf[0]] +"</td>";
+              str += "<td>"+ JSON.stringify(res[k]._source); +"</td>";
+            } else {
+              str += "<td>"+ res[k].fields[tf[0]] +"</td>";
+              for (var f in res[k].fields) {
+                  if (f==tf[0]) {
+                    continue;
+                  } else {
+                    str+="<td>" + res[k].fields[f]+"</td>";
+                  }
+              }
+            }
+            str+="</tr>";
+          }
+          str+="</tbody></table>";
+        } else {
+          str = "<h3>No search results found</h3>";
         }
         $("#result").html(str);
       },

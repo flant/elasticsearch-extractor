@@ -27,6 +27,7 @@ import (
 
 	"time"
 
+	//"github.com/Jeffail/gabs/v2"
 	"github.com/flant/elasticsearch-extractor/modules/config"
 	"github.com/flant/elasticsearch-extractor/modules/front"
 	"github.com/flant/elasticsearch-extractor/modules/version"
@@ -43,17 +44,18 @@ type Router struct {
 type apiRequest struct {
 	Action string `json:"action,omitempty"` // Имя вызываемого метода*
 	Values struct {
-		Indices   []string `json:"indices,omitempty"`
-		Repo      string   `json:"repo,omitempty"`
-		OrderDir  string   `json:"odir,omitempty"`
-		OrderType string   `json:"otype,omitempty"`
-		Snapshot  string   `json:"snapshot,omitempty"`
-		Index     string   `json:"index,omitempty"`
-		Cluster   string   `json:"cluster,omitempty"`
-		Xql       string   `json:"xql,omitempty"`
-		Fields    []string `json:"fields,omitempty"`
-		DateStart string   `json:"date_start,omitempty"`
-		DateEnd   string   `json:"date_end,omitempty"`
+		Indices    []string `json:"indices,omitempty"`
+		Repo       string   `json:"repo,omitempty"`
+		OrderDir   string   `json:"odir,omitempty"`
+		OrderType  string   `json:"otype,omitempty"`
+		Snapshot   string   `json:"snapshot,omitempty"`
+		Index      string   `json:"index,omitempty"`
+		Cluster    string   `json:"cluster,omitempty"`
+		Xql        string   `json:"xql,omitempty"`
+		Fields     []string `json:"fields,omitempty"`
+		Timefields []string `json:"timefields,omitempty"`
+		DateStart  string   `json:"date_start,omitempty"`
+		DateEnd    string   `json:"date_end,omitempty"`
 	} `json:"values,omitempty"`
 }
 
@@ -111,14 +113,6 @@ type IndexInSnap struct {
 
 type indexGroup struct {
 	Index string `json:"index,omitempty"`
-}
-
-type IndexMapping map[string]struct {
-	Mappings struct {
-		Properties map[string]struct {
-			Type string
-		}
-	}
 }
 
 type Cluster struct {
@@ -518,24 +512,34 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	case "get_mapping":
 		{
 			t := time.Now()
-			var m IndexMapping
+			var (
+				fullm map[string]interface{}
+				m     map[string]interface{}
+			)
+
+			flatMap := make(map[string]string)
 			response, err := rt.doGet(request.Values.Cluster + request.Values.Index + t.Format("2006.01.02") + "/_mapping")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-			err = json.Unmarshal(response, &m)
+
+			err = json.Unmarshal(response, &fullm)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-			var j []byte
-			for _, v := range m {
-				j, _ = json.Marshal(v.Mappings.Properties)
-				break
+			for _, v := range fullm {
+				m = v.(map[string]interface{})
 			}
+
+			if mapping, hasMap := m["mappings"]; hasMap {
+				rt.flattenMap("", mapping.(map[string]interface{})["properties"].(map[string]interface{}), flatMap)
+			}
+
+			j, _ := json.Marshal(flatMap)
 
 			w.Write(j)
 		}
@@ -562,20 +566,30 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			*/
 			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateStart+" (MSK)")
 			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateEnd+" (MSK)")
+			var use_source string
+			var query string
 
-			query := `{
+			if len(request.Values.Fields) == 0 {
+				use_source = `"_source": true,`
+			} else {
+				use_source = `"_source": false,`
+			}
+			if len(request.Values.Timefields) > 0 {
+				timefield := request.Values.Timefields[0]
+
+				query = `{
 						"sort": [
-							{"timestamp": "desc"}
+							{"` + timefield + `": "desc"}
 						],
-						"_source": false,
-						"fields": [ "` + strings.Join(request.Values.Fields, "\", \"") + `" ],
+						` + use_source + `
+						"fields": ["` + timefield + `", "` + strings.Join(request.Values.Fields, "\", \"") + `" ],
 						  "query": {
 						    "bool": {
 						      "must": [],
 						      "filter": [
 						        {
 						          "range": {
-						            "timestamp": {
+						            "` + timefield + `": {
 						              "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
 						              "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
 						              "format": "strict_date_optional_time"
@@ -588,6 +602,22 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 						    }
 						  }
 						}`
+
+			} else {
+				query = `{
+						"size": 500,
+						` + use_source + `
+						"fields": ["` + strings.Join(request.Values.Fields, "\", \"") + `" ],
+						  "query": {
+						    "bool": {
+						      "must": [],
+						      "filter": [],
+						      "should": [],
+						      "must_not": []
+						    }
+						  }
+						}`
+			}
 			log.Println(query)
 			var req map[string]interface{}
 			_ = json.Unmarshal([]byte(query), &req)
@@ -597,7 +627,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-			//j, _ := json.Marshal(response)
 			w.Write(response)
 		}
 
