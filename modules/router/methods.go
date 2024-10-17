@@ -50,23 +50,46 @@ func (rt *Router) netClientPrepare() {
 		TLSClientConfig: tlsClientConfig,
 	}
 
-	rt.nc = &http.Client{
+	rt.nc["Snapshot"] = &http.Client{
 		Timeout:   time.Second * time.Duration(rt.conf.App.TimeOut),
 		Transport: netTransport,
 	}
+
+	if rt.conf.Search.Host != "" {
+		tlsClientConfig := createTLSConfig(rt.conf.Search.CAcert, rt.conf.Search.ClientCert,
+			rt.conf.Search.ClientKey, rt.conf.Search.InsecureSkipVerify)
+		var netTransport = &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: time.Duration(rt.conf.App.TimeOut) * time.Second,
+			}).Dial,
+			TLSClientConfig: tlsClientConfig,
+		}
+
+		rt.nc["Search"] = &http.Client{
+			Timeout:   time.Second * time.Duration(rt.conf.App.TimeOut),
+			Transport: netTransport,
+		}
+
+	}
+
 }
 
-func (rt *Router) doDel(url string) ([]byte, error) {
+func (rt *Router) doDel(url string, cluster string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("DELETE", url, nil)
-	if rt.conf.Snapshot.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
-	}
-
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
+	if cluster == "Search" {
+		if rt.conf.Search.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Search.Username, rt.conf.Search.Password)
+		}
+	} else {
+		if rt.conf.Snapshot.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
+		}
+	}
 
-	actionResult, err := rt.nc.Do(actionRequest)
+	actionResult, err := rt.nc[cluster].Do(actionRequest)
 	if actionResult != nil {
 		defer actionResult.Body.Close()
 	}
@@ -86,17 +109,22 @@ func (rt *Router) doDel(url string) ([]byte, error) {
 	return body, nil
 }
 
-func (rt *Router) doGet(url string) ([]byte, error) {
+func (rt *Router) doGet(url string, cluster string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("GET", url, nil)
-	if rt.conf.Snapshot.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
-	}
-
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 
-	actionResult, err := rt.nc.Do(actionRequest)
+	if cluster == "Search" {
+		if rt.conf.Search.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Search.Username, rt.conf.Search.Password)
+		}
+	} else {
+		if rt.conf.Snapshot.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
+		}
+	}
+	actionResult, err := rt.nc[cluster].Do(actionRequest)
 	if actionResult != nil {
 		defer actionResult.Body.Close()
 	}
@@ -116,18 +144,26 @@ func (rt *Router) doGet(url string) ([]byte, error) {
 	return body, nil
 }
 
-func (rt *Router) doPost(url string, request map[string]interface{}) ([]byte, error) {
+func (rt *Router) doPost(url string, request map[string]interface{}, cluster string) ([]byte, error) {
 	toBackend, _ := json.Marshal(request)
 
 	actionRequest, _ := http.NewRequest("POST", url, bytes.NewReader(toBackend))
-	if rt.conf.Snapshot.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
-	}
 
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 
-	actionResult, err := rt.nc.Do(actionRequest)
+	if cluster == "Search" {
+		if rt.conf.Search.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Search.Username, rt.conf.Search.Password)
+		}
+
+	} else {
+		if rt.conf.Snapshot.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
+		}
+	}
+
+	actionResult, err := rt.nc[cluster].Do(actionRequest)
 	if actionResult != nil {
 		defer actionResult.Body.Close()
 	}
@@ -157,7 +193,7 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 	//	rt.nodes.RLock()
 	//	defer rt.nodes.RUnlock()
 
-	response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name")
+	response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name", "Snapshot")
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +223,7 @@ func (rt *Router) getIndexGroups() ([]indexGroup, error) {
 	//	rt.nodes.RLock()
 	//	defer rt.nodes.RUnlock()
 	t := time.Now()
-	response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/indices/*-" + t.Format("2006.01.02") + "*,-.*/?format=json&h=index")
+	response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/indices/*-"+t.Format("2006.01.02")+"*,-.*/?format=json&h=index", "Search")
 	if err != nil {
 		return nil, err
 	}

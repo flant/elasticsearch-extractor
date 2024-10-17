@@ -34,9 +34,15 @@ import (
 	"github.com/uzhinskiy/lib.go/helpers"
 )
 
+type Filter struct {
+	Field     string `json:"field,omitempty"`
+	Operation string `json:"operation,omitempty"`
+	Value     string `json:"value,omitempty"`
+}
+
 type Router struct {
 	conf  config.Config
-	nc    *http.Client
+	nc    map[string]*http.Client
 	nodes nodesArray
 	sl    snapList
 }
@@ -44,18 +50,19 @@ type Router struct {
 type apiRequest struct {
 	Action string `json:"action,omitempty"` // Имя вызываемого метода*
 	Values struct {
-		Indices    []string `json:"indices,omitempty"`
-		Repo       string   `json:"repo,omitempty"`
-		OrderDir   string   `json:"odir,omitempty"`
-		OrderType  string   `json:"otype,omitempty"`
-		Snapshot   string   `json:"snapshot,omitempty"`
-		Index      string   `json:"index,omitempty"`
-		Cluster    string   `json:"cluster,omitempty"`
-		Xql        string   `json:"xql,omitempty"`
-		Fields     []string `json:"fields,omitempty"`
-		Timefields []string `json:"timefields,omitempty"`
-		DateStart  string   `json:"date_start,omitempty"`
-		DateEnd    string   `json:"date_end,omitempty"`
+		Indices    []string          `json:"indices,omitempty"`
+		Repo       string            `json:"repo,omitempty"`
+		OrderDir   string            `json:"odir,omitempty"`
+		OrderType  string            `json:"otype,omitempty"`
+		Snapshot   string            `json:"snapshot,omitempty"`
+		Index      string            `json:"index,omitempty"`
+		Cluster    string            `json:"cluster,omitempty"`
+		Xql        string            `json:"xql,omitempty"`
+		Fields     []string          `json:"fields,omitempty"`
+		Filters    map[string]Filter `json:"filters,omitempty"`
+		Timefields []string          `json:"timefields,omitempty"`
+		DateStart  string            `json:"date_start,omitempty"`
+		DateEnd    string            `json:"date_end,omitempty"`
 	} `json:"values,omitempty"`
 }
 
@@ -132,6 +139,7 @@ type IndicesInSnap map[string]*IndexInSnap
 func Run(cnf config.Config) {
 	rt := Router{}
 	rt.conf = cnf
+	rt.nc = make(map[string]*http.Client)
 	rt.netClientPrepare()
 	_, err := rt.getNodes()
 	if err != nil {
@@ -207,7 +215,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	switch request.Action {
 	case "get_repositories":
 		{
-			response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/repositories?format=json")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/repositories?format=json", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -230,7 +238,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "get_indices":
 		{
-			response, err := rt.doGet(rt.conf.Snapshot.Host + "extracted*/_recovery/")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"extracted*/_recovery/", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -248,7 +256,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
-			response, err := rt.doDel(rt.conf.Snapshot.Host + request.Values.Index)
+			response, err := rt.doDel(rt.conf.Snapshot.Host+request.Values.Index, "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -267,7 +275,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			response, err := rt.doGet(rt.conf.Snapshot.Host + "_cat/snapshots/" + request.Values.Repo + "?format=json")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/snapshots/"+request.Values.Repo+"?format=json", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -383,7 +391,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			status_response, err := rt.doGet(rt.conf.Snapshot.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
+			status_response, err := rt.doGet(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_status", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -409,7 +417,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			status_response, err := rt.doGet(rt.conf.Snapshot.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
+			status_response, err := rt.doGet(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_status", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -448,7 +456,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				"index_settings":       map[string]interface{}{"index.number_of_replicas": 0},
 			}
 
-			response, err := rt.doPost(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req)
+			response, err := rt.doPost(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req, "Snapshot")
 			if err != nil {
 				msg := fmt.Sprintf(`{"error":"%s"}`, err)
 				http.Error(w, msg, 500)
@@ -469,7 +477,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							"title":         "extracted_v3-*",
 							"timeFieldName": "timestamp"}}
 
-					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:v3-080", ip_req)
+					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:v3-080", ip_req, "Snapshot")
 					if err != nil {
 						msg := fmt.Sprintf(`{"error":"%s"}`, err)
 						http.Error(w, msg, 500)
@@ -482,7 +490,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							"title":         "extracted_*",
 							"timeFieldName": "@timestamp"}}
 
-					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:080", ip_req)
+					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:080", ip_req, "Snapshot")
 					if err != nil {
 						msg := fmt.Sprintf(`{"error":"%s"}`, err)
 						http.Error(w, msg, 500)
@@ -518,7 +526,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			)
 
 			flatMap := make(map[string]string)
-			response, err := rt.doGet(request.Values.Cluster + request.Values.Index + t.Format("2006.01.02") + "/_mapping")
+			response, err := rt.doGet(request.Values.Cluster+request.Values.Index+t.Format("2006.01.02")+"/_mapping", "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -555,79 +563,81 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "search":
 		{
-			/*
-				req := map[string]interface{}{
-					"sort":    map[string]interface{}{"@timestamp": "desc"},
-					"_source": false,
-					"size":    500,
-					"fields":  []string{"@timestamp", "audit_cluster_name", "audit_category"},
-					"query":   map[string]interface{}{"match_phrase": map[string]interface{}{"audit_cluster_name": "docker-cluster"}},
-				}
-			*/
-			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateStart+" (MSK)")
-			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateEnd+" (MSK)")
 			var use_source string
 			var query string
+			var filters string
+			var must_not string
+			var xql string
+			var full_query string
+			var timefield string
+			var sort string
+			var tf string
+			var fields string
+			var req map[string]interface{}
+
+			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateStart+" (MSK)")
+			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateEnd+" (MSK)")
 
 			if len(request.Values.Fields) == 0 {
-				use_source = `"_source": true,`
+				use_source = `"_source": true`
 			} else {
-				use_source = `"_source": false,`
+				use_source = `"_source": false`
+			}
+
+			for _, f := range request.Values.Filters {
+
+				if f.Operation == "is" {
+					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "exists" {
+					filters += `{ "exists": {"field":"` + f.Field + `" } },`
+				} else if f.Operation == "is_not" {
+					must_not += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "does_not_exists" {
+					must_not += `{ "exists": {"field":"` + f.Field + `" } },`
+				}
+			}
+			filters += `{"match_all": {}}`
+			must_not, _ = strings.CutSuffix(must_not, ",")
+
+			if request.Values.Xql != "" {
+				xql = `{ "simple_query_string": { "query": "` + request.Values.Xql + `" } }`
 			}
 			if len(request.Values.Timefields) > 0 {
-				timefield := request.Values.Timefields[0]
-
-				query = `{
-						"sort": [
-							{"` + timefield + `": "desc"}
-						],
-						` + use_source + `
-						"fields": ["` + timefield + `", "` + strings.Join(request.Values.Fields, "\", \"") + `" ],
-						  "query": {
-						    "bool": {
-						      "must": [],
-						      "filter": [
-						        {
-						          "range": {
-						            "` + timefield + `": {
-						              "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
-						              "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
-						              "format": "strict_date_optional_time"
-						            }
-						          }
-						        }
-						      ],
-						      "should": [],
-						      "must_not": []
-						    }
-						  }
-						}`
-
+				timefield = request.Values.Timefields[0]
+				fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Values.Fields, "\", \"") + `" ]`
+				sort = `"sort": [ {"` + timefield + `": "desc" } ]`
+				tf = `{ "range": { "` + timefield + `": {
+						   "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
+						   "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
+						   "format": "strict_date_optional_time" } } },`
 			} else {
-				query = `{
-						"size": 500,
-						` + use_source + `
-						"fields": ["` + strings.Join(request.Values.Fields, "\", \"") + `" ],
-						  "query": {
-						    "bool": {
-						      "must": [],
-						      "filter": [],
-						      "should": [],
-						      "must_not": []
-						    }
-						  }
-						}`
+				sort = ""
+				tf = ""
+				fields = `"fields": ["` + strings.Join(request.Values.Fields, "\", \"") + `" ]`
 			}
-			log.Println(query)
-			var req map[string]interface{}
-			_ = json.Unmarshal([]byte(query), &req)
-			response, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req)
+			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
+
+			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
+
+			_ = json.Unmarshal([]byte("{"+query+"}"), &req)
+
+			/*cresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_count", req, "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-			w.Write(response)
+			w.Write(cresponse)*/
+
+			log.Println(full_query)
+			_ = json.Unmarshal([]byte(full_query), &req)
+			sresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req, "Search")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			w.Write(sresponse)
 		}
 
 	default:
