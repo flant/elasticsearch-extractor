@@ -629,7 +629,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			w.Write(cresponse)*/
 
-			log.Println(full_query)
 			_ = json.Unmarshal([]byte(full_query), &req)
 			sresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req, "Search")
 			if err != nil {

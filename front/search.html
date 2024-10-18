@@ -395,6 +395,7 @@ $("#search").click(function(){
     fields = []
     tf = []
     xql = $('#xql').val()
+    indexOfLargestValue = 0
     $("input[name='fields']").each(function() {
       if (this.dataset.type=="date") {
         tf.push(this.value)
@@ -429,11 +430,19 @@ $("#search").click(function(){
         var str = "";
 
         if ( res.length > 0 ) {
+          if ( fields.length > 0 ) {
+            fields_size = []
+            for (var k in res) {
+              fields_size[k] = Object.keys(res[k].fields).length
+            }
+            indexOfLargestValue = fields_size.reduce((maxIndex, currentValue, currentIndex, array) => currentValue > array[maxIndex] ? currentIndex : maxIndex, 0)
+          } 
+        
           str = "<table  class='table'><thead><tr><th>Time</th>";
             if ( fields.length == 0 ) {
               str+="<th>_source</th>";
             } else {
-              for (var f in res[0].fields) {
+              for (var f in res[indexOfLargestValue].fields) {
                   if (f==tf[0]) {
                     continue;
                   } else {
@@ -460,17 +469,21 @@ $("#search").click(function(){
               str += "<td style='word-wrap: break-word !important; word-break: break-word;'>"+ s +"</td>";
             } else {
               str += "<td>"+ res[k].fields[tf[0]] +"</td>";
-              for (var f in res[k].fields) {
+              for (var f in res[indexOfLargestValue].fields) {
                 if (f==tf[0]) {
                    continue;
                 } else {
-                  r = res[k].fields[f].toString();
+                  if(typeof res[k].fields[f] === "undefined"){
+                    r = " --- "
+                  } else {
+                    r = res[k].fields[f].toString();
+                  }
                   if (xql !="") {
                     s = r.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
                   } else {
                     s = r
                   }
-                  str += "<td>" + s + "</td>";
+                  str += "<td style='word-wrap: break-word !important; word-break: break-word;'>" + s + "</td>";
                 }
               }
             }
