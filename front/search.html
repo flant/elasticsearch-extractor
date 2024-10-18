@@ -212,9 +212,8 @@ $(document).ready(function(){
         for(var k in data) {
           name = data[k].Name;
           host = data[k].Host;
-          $('#clusters').append(new Option(name, host,true,true));
+          $('#clusters').append(new Option(name, host,false,false));
         }
-        $("#loading").addClass('invisible');
     }
   });
 });
@@ -240,11 +239,11 @@ $('#clusters').on('change', function(e) {
         contentType: 'application/json',
         success: function (data) {
           var str = "";
+          $('#igs').append(new Option("Select...", "",true,true));
           for(var k in data) {
             index = data[k].index;
             $('#igs').append(new Option(index, index,false,false));
           }
-          $("#loading").addClass('invisible');
       }
     });
   }
@@ -272,7 +271,6 @@ $('#igs').on('change', function(e) {
             mapping.push(k);
           }
           $("#fields").html(str);
-          $("#loading").addClass('invisible');
       }
     });
 });
@@ -445,12 +443,19 @@ $("#search").click(function(){
               }
             }
           str+="</tr></thead><tbody>";
-          term = xql.replace(new RegExp(" ", "gi"), (match) => `|`);
+          if (xql !="") {
+            term = xql.replace(new RegExp(" ", "gi"), (match) => `|`);
+          }
+          
           for (var k in res) {
             str += "<tr>";
             if ( fields.length == 0 ) {
               r = JSON.stringify(res[k]._source)
-              s = r.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
+              if (xql !="") {
+                s = r.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
+              } else {
+                s = r
+              }
               str += "<td>"+ res[k]._source[tf[0]] +"</td>";
               str += "<td style='word-wrap: break-word !important; word-break: break-word;'>"+ s +"</td>";
             } else {
@@ -460,7 +465,11 @@ $("#search").click(function(){
                    continue;
                 } else {
                   r = res[k].fields[f].toString();
-                  s = r.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
+                  if (xql !="") {
+                    s = r.replace(new RegExp(term, "gi"), (match) => `<mark>${match}</mark>`);
+                  } else {
+                    s = r
+                  }
                   str += "<td>" + s + "</td>";
                 }
               }
