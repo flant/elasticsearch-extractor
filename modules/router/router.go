@@ -19,6 +19,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path"
 	"regexp"
 	"sort"
@@ -27,7 +28,6 @@ import (
 
 	"time"
 
-	//"github.com/Jeffail/gabs/v2"
 	"github.com/flant/elasticsearch-extractor/modules/config"
 	"github.com/flant/elasticsearch-extractor/modules/front"
 	"github.com/flant/elasticsearch-extractor/modules/version"
@@ -50,20 +50,26 @@ type Router struct {
 type apiRequest struct {
 	Action string `json:"action,omitempty"` // Имя вызываемого метода*
 	Values struct {
-		Indices    []string          `json:"indices,omitempty"`
-		Repo       string            `json:"repo,omitempty"`
-		OrderDir   string            `json:"odir,omitempty"`
-		OrderType  string            `json:"otype,omitempty"`
-		Snapshot   string            `json:"snapshot,omitempty"`
-		Index      string            `json:"index,omitempty"`
-		Cluster    string            `json:"cluster,omitempty"`
-		Xql        string            `json:"xql,omitempty"`
-		Fields     []string          `json:"fields,omitempty"`
-		Filters    map[string]Filter `json:"filters,omitempty"`
-		Timefields []string          `json:"timefields,omitempty"`
-		DateStart  string            `json:"date_start,omitempty"`
-		DateEnd    string            `json:"date_end,omitempty"`
+		Indices   []string `json:"indices,omitempty"`
+		Repo      string   `json:"repo,omitempty"`
+		OrderDir  string   `json:"odir,omitempty"`
+		OrderType string   `json:"otype,omitempty"`
+		Snapshot  string   `json:"snapshot,omitempty"`
+		Index     string   `json:"index,omitempty"`
 	} `json:"values,omitempty"`
+	Search struct {
+		Index       string            `json:"index,omitempty"`
+		Cluster     string            `json:"cluster,omitempty"`
+		Xql         string            `json:"xql,omitempty"`
+		Fields      []string          `json:"fields,omitempty"`
+		Filters     map[string]Filter `json:"filters,omitempty"`
+		Timefields  []string          `json:"timefields,omitempty"`
+		DateStart   string            `json:"date_start,omitempty"`
+		DateEnd     string            `json:"date_end,omitempty"`
+		SearchAfter string            `json:"search_after,omitempty"`
+		Count       bool              `json:"count,omitempty"`
+		Fname       string            `json:"fname,omitempty"`
+	} `json:"search,omitempty"`
 }
 
 type snapStatus struct {
@@ -154,6 +160,7 @@ func Run(cnf config.Config) {
 // web-ui
 func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	file := r.URL.Path
+
 	remoteIP := helpers.GetIP(r.RemoteAddr, r.Header.Get("X-Real-IP"), r.Header.Get("X-Forwarded-For"))
 	if file == "/" {
 		file = "/index.html"
@@ -161,6 +168,35 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	if file == "/search/" {
 		file = "/search.html"
 	}
+
+	if strings.Contains(file, "/data/") {
+		wdir, err := os.Getwd()
+		if err != nil {
+			log.Println(err)
+		}
+
+		fi, err := os.Lstat(wdir + file)
+		if err != nil {
+			http.Error(w, err.Error(), 404)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
+			return
+		}
+
+		bytes, err := getFile(wdir+file, fi.Size())
+		if err != nil {
+			http.Error(w, err.Error(), 404)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
+			return
+		}
+		contentType := mime.TypeByExtension(path.Ext(wdir + file))
+
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("X-Server", version.Version)
+		w.Write(bytes)
+		return
+	}
+
 	cFile := strings.Replace(file, "/", "", 1)
 	data, err := front.Asset(cFile)
 	if err != nil {
@@ -526,7 +562,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			)
 
 			flatMap := make(map[string]string)
-			response, err := rt.doGet(request.Values.Cluster+request.Values.Index+t.Format("2006.01.02")+"/_mapping", "Search")
+			response, err := rt.doGet(request.Search.Cluster+request.Search.Index+t.Format("2006.01.02")+"/_mapping", "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -564,6 +600,91 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	case "search":
 		{
 			var use_source string
+			var query string
+			var filters string
+			var must_not string
+			var xql string
+			var full_query string
+			var timefield string
+			var sort string
+			var tf string
+			var fields string
+			var req map[string]interface{}
+
+			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
+			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
+
+			if len(request.Search.Fields) == 0 {
+				use_source = `"_source": true`
+			} else {
+				use_source = `"_source": false`
+			}
+
+			for _, f := range request.Search.Filters {
+
+				if f.Operation == "is" {
+					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "exists" {
+					filters += `{ "exists": {"field":"` + f.Field + `" } },`
+				} else if f.Operation == "is_not" {
+					must_not += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "does_not_exists" {
+					must_not += `{ "exists": {"field":"` + f.Field + `" } },`
+				}
+			}
+			filters += `{"match_all": {}}`
+			must_not, _ = strings.CutSuffix(must_not, ",")
+
+			if request.Search.Xql != "" {
+				xql = `{ "simple_query_string": { "query": "` + request.Search.Xql + `" } }`
+			}
+			if len(request.Search.Timefields) > 0 {
+				timefield = request.Search.Timefields[0]
+				fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+				sort = `"sort": [ {"` + timefield + `": "desc" } ]`
+				tf = `{ "range": { "` + timefield + `": {
+						   "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
+						   "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
+						   "format": "strict_date_optional_time" } } },`
+			} else {
+				sort = ""
+				tf = ""
+				fields = `"fields": ["` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+			}
+			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
+
+			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
+
+			if request.Search.Count {
+				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
+				cresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_count", req, "Search")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+					return
+				}
+				w.Write(cresponse)
+			} else {
+				_ = json.Unmarshal([]byte(full_query), &req)
+				sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search", req, "Search")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+					return
+				}
+				w.Write(sresponse)
+			}
+
+		}
+
+	case "download":
+		{
+			path, err := os.Getwd()
+			if err != nil {
+				log.Println(err)
+			}
+			allocateSpaceForFile(path+"/data/"+request.Search.Fname+".csv", 100)
+			/*var use_source string
 			var query string
 			var filters string
 			var must_not string
@@ -619,24 +740,26 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
 
-			_ = json.Unmarshal([]byte("{"+query+"}"), &req)
-
-			/*cresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_count", req, "Search")
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
-				return
+			if request.Values.Count {
+				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
+				cresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_count", req, "Search")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+					return
+				}
+				w.Write(cresponse)
+			} else {
+				_ = json.Unmarshal([]byte(full_query), &req)
+				sresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req, "Search")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+					return
+				}
+				w.Write(sresponse)
 			}
-			w.Write(cresponse)*/
-
-			_ = json.Unmarshal([]byte(full_query), &req)
-			sresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req, "Search")
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
-				return
-			}
-			w.Write(sresponse)
+			*/
 		}
 
 	default:
@@ -647,5 +770,16 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
+	}
+}
+
+func allocateSpaceForFile(path string, size int64) {
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := f.Truncate(size); err != nil {
+		log.Fatal(err)
 	}
 }

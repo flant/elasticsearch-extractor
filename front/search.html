@@ -49,12 +49,12 @@ mark {
           </nav>
         </div> <!-- /.left -->
         <main class="col-xl-10 py-md-4 pl-md-2 bd-content" role="main">
-          <form action="/api/" role="form" method="POST" id="update_form">
+          <form action="/api/" role="form" method="POST" id="search_form">
             <input type="hidden" name="action" value="search">
             <input type="hidden" name="idx" id="idx">
             <input type="hidden" name="cluster" id="cluster">
               <div class="form-row">
-                <div class="col-8">
+                <div class="col-7">
                   <input id="xql" type="text" class="form-control form-control-sm">
                 </div>
                 <div class="col">
@@ -66,11 +66,27 @@ mark {
                 <div class="col">
                   <button type="button" class="btn btn-primary btn-sm" id="search">Search</button>
                 </div>
+                <div class="col">
+                  <button type="button" class="btn btn-success btn-sm" id="download" disabled>Xtract it</button>
+                  <span id="download_link"></span>
+                </div>
               </div>
           </form>
-          <div class="py-md-2"><a href="#"  data-target='#modal_add_filter' data-toggle='modal'>Add filter</a><span class="mb-2 overflow-auto" style="max-height: 1024px;" id="filters"> </span></div>
+          <div class="py-md-2"><a href="#" data-target='#modal_add_filter' data-toggle='modal'>Добавить фильтр</a><span class="mb-2 overflow-auto" style="max-height: 1024px;" id="filters"> </span></div>
           <div class="d-flex align-items-center invisible" id="loading"><strong>Loading...</strong><div class="spinner-border ml-auto" role="status" aria-hidden="true"></div></div>
-          <span class="mb-0 overflow-auto" style="max-height: 1024px;" id="result"> </span>
+          <span class="mb-0 overflow-auto" style="max-height: 1024px;" id="result">
+            <div class="jumbotron">
+              <h3> Описание работы</h3>
+              <ul>
+                <li> Выбираем кластер</li>
+                <li> Выбираем индекс</li>
+                <li> Выбираем промежуток времени</li>
+                <li> При необходимости задаем фильтры</li>
+                <li> В поисковой строке можно указать ключевые слова для поиска</li>
+                <li> Если полученый результат(500 шзаписей максимум) устраивает - нажимаем Xtract it</li>
+              </ul>
+            </div>
+          </span>
         </main><!-- /.main -->
 
     </div><!-- /.row -->
@@ -223,7 +239,7 @@ $('#clusters').on('change', function(e) {
     if (cluster!=-1) {
       var post = {
         "action": "get_index_groups",
-        "values" : {
+        "search" : {
           "cluster": cluster
         }
       };
@@ -252,7 +268,7 @@ $('#clusters').on('change', function(e) {
 $('#igs').on('change', function(e) {
       var post = {
         "action": "get_mapping",
-        "values" : {
+        "search" : {
           "cluster": $('#cluster').val(),
           "index": $('#igs').val()
         }
@@ -280,11 +296,11 @@ $('#modal_add_filter').on('shown.bs.modal',function(e){
     $('#add_filter_fieldlist').find('option')
     .remove()
     .end();
-    
+
     $('#add_filter_operation').find('option')
     .remove()
     .end();
-    
+
     $('#add_filter_uuid').val((Math.random() + 1).toString(36).substring(7));
     
     $('#add_filter_fieldlist').append(new Option("Select...", "",true,true));
@@ -314,7 +330,7 @@ $("#add_filter_save").click(function(){
     str += "<button type='button' id='" + $("#add_filter_uuid").val() + "' class='btn filter' data-target='#modal_update_filter' data-toggle='modal' data-uuid='" + $("#add_filter_uuid").val() + "' data-field='" + $("#add_filter_fieldlist").val() + "' data-oper='exists' data-value=''>" + $("#add_filter_fieldlist").val() + ": exists</button>";
   } else if ($("#add_filter_operation").val()=="does_not_exists") {
     str += "<button type='button' id='" + $("#add_filter_uuid").val() + "' class='btn filter' data-target='#modal_update_filter' data-toggle='modal' data-uuid='" + $("#add_filter_uuid").val() + "' data-field='" + $("#add_filter_fieldlist").val() + "' data-oper='does_not_exists' data-value=''>" + $("#add_filter_fieldlist").val() + ": not exists</button>";
-  } 
+  }
   $("#filters").html(str);
   filters_set[btn_id] = {"field":$("#add_filter_fieldlist").val(), "operation": $("#add_filter_operation").val(), "value": $("#add_filter_value").val()};
   event.preventDefault();
@@ -388,15 +404,14 @@ $("#filters").on("click", "button.filter", function(e){
     }
 });
 
-
 $("#search").click(function(){
     $("#loading").removeClass('invisible');
-    console.log($("#loading"))
     $("#result").html("");
-    fields = []
-    tf = []
-    xql = $('#xql').val()
-    indexOfLargestValue = 0
+    fields = [];
+    tf = [];
+    xql = $('#xql').val();
+    indexOfLargestValue = 0;
+    total = 0;
     $("input[name='fields']").each(function() {
       if (this.dataset.type=="date") {
         tf.push(this.value)
@@ -408,7 +423,7 @@ $("#search").click(function(){
 
     var post = {
       "action": "search",
-      "values" : {
+      "search" : {
         "index": $('#igs').val(),
         "fields": fields,
         "filters": filters_set,
@@ -417,9 +432,36 @@ $("#search").click(function(){
         "xql": xql,
         "date_start":$('#datetimepicker_start').val(),
         "date_end":$('#datetimepicker_end').val(),
+        "count": true
       }
     };
-    
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {
+        total = data.count
+      } 
+    });
+
+    var post = {
+      "action": "search",
+      "search" : {
+        "index": $('#igs').val(),
+        "fields": fields,
+        "filters": filters_set,
+        "timefields": tf,
+        "cluster": $('#cluster').val(),
+        "xql": xql,
+        "date_start":$('#datetimepicker_start').val(),
+        "date_end":$('#datetimepicker_end').val(),
+        "count": false
+      }
+    };
+
     $.ajax({
       type: "POST",
       url: "/api/",
@@ -428,6 +470,7 @@ $("#search").click(function(){
       contentType: 'application/json',
       success: function (data) {
         res = data.hits.hits
+        
         var str = "";
 
         if ( res.length > 0 ) {
@@ -437,9 +480,9 @@ $("#search").click(function(){
               fields_size[k] = Object.keys(res[k].fields).length
             }
             indexOfLargestValue = fields_size.reduce((maxIndex, currentValue, currentIndex, array) => currentValue > array[maxIndex] ? currentIndex : maxIndex, 0)
-          } 
-        
-           str = "<table  class='table'><thead><tr><th>Time (desc)</th>";
+          }
+           str += "<h3>Это демо-версия результатов поиска - "+res.length+" из "+total+" записей</h3>"
+           str += "<table  class='table'><thead><tr><th>Time (desc)</th>";
             if ( fields.length == 0 ) {
               str+="<th>_source</th>";
             } else {
@@ -449,14 +492,12 @@ $("#search").click(function(){
                   } else {
                     str+="<th>" + f + "</th>";
                   }
-                  
               }
             }
           str+="</tr></thead><tbody>";
           if (xql !="") {
             term = xql.replace(new RegExp(" ", "gi"), (match) => `|`);
           }
-          
           for (var k in res) {
             str += "<tr>";
             if ( fields.length == 0 ) {
@@ -491,8 +532,10 @@ $("#search").click(function(){
             str+="</tr>";
           }
           str+="</tbody></table>";
+        $("#download").prop('disabled', false);
         } else {
           str = "<h3>No search results found</h3>";
+          $("#download").prop('disabled', true);
         }
         $("#result").html(str);
       },
@@ -502,6 +545,52 @@ $("#search").click(function(){
     });
     $("#loading").addClass('invisible');
     //event.preventDefault();
+});
+
+$("#download").click(function(){
+    $("#loading").removeClass('invisible');
+    fname = (Math.random() + 1).toString(36).substring(7);
+    fields = []
+    tf = []
+    xql = $('#xql').val()
+    indexOfLargestValue = 0
+    $("input[name='fields']").each(function() {
+      if (this.dataset.type=="date") {
+        tf.push(this.value)
+      }
+      if (this.checked) {
+        fields.push(this.value)
+      }
+    });
+
+    var post = {
+      "action": "download",
+      "search" : {
+        "index": $('#igs').val(),
+        "fields": fields,
+        "filters": filters_set,
+        "timefields": tf,
+        "cluster": $('#cluster').val(),
+        "xql": xql,
+        "date_start":$('#datetimepicker_start').val(),
+        "date_end":$('#datetimepicker_end').val(),
+        "count": false,
+        "fname": fname
+      }
+    };
+
+    $.ajax({
+      type: "POST",
+      url: "/api/",
+      data: JSON.stringify(post),
+      dataType: 'json',
+      contentType: 'application/json',
+      success: function (data) {},
+      error: function (data) {
+        $("#download_link").html("<a href='/data/"+fname+".csv'>скачать</a>");
+      }
+    })
+    $("#loading").addClass('invisible');
 });
 
 $('#add_filter').on('hidden.bs.modal',function(){

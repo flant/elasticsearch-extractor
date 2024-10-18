@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	"bytes"
 	"net"
@@ -287,4 +288,16 @@ func (rt *Router) flattenMap(prefix string, nestedMap map[string]interface{}, fl
 			}
 		}
 	}
+}
+
+func getFile(fname string, size int64) ([]byte, error) {
+	respFile, err := os.OpenFile(fname, os.O_RDONLY, 0)
+
+	defer respFile.Close()
+	if err != nil {
+		return nil, err
+	}
+	bytes := make([]byte, size)
+	respFile.Read(bytes)
+	return bytes, nil
 }
