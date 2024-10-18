@@ -391,6 +391,7 @@ $("#filters").on("click", "button.filter", function(e){
 
 $("#search").click(function(){
     $("#loading").removeClass('invisible');
+    console.log($("#loading"))
     $("#result").html("");
     fields = []
     tf = []
@@ -438,7 +439,7 @@ $("#search").click(function(){
             indexOfLargestValue = fields_size.reduce((maxIndex, currentValue, currentIndex, array) => currentValue > array[maxIndex] ? currentIndex : maxIndex, 0)
           } 
         
-          str = "<table  class='table'><thead><tr><th>Time</th>";
+           str = "<table  class='table'><thead><tr><th>Time (desc)</th>";
             if ( fields.length == 0 ) {
               str+="<th>_source</th>";
             } else {
