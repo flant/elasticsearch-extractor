@@ -14,6 +14,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -50,6 +51,13 @@ func init() {
 
 	cnf = config.Parse(configfile)
 	log.Println("Bootstrap: successful parsing config file. Items: ", cnf)
+	if _, err := os.Stat("/tmp/data"); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir("/tmp/data", os.ModePerm)
+		if err != nil {
+			log.Fatalf("cannot create directory: %s\n", err)
+		}
+	}
+
 }
 
 func main() {

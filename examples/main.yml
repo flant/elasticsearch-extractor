@@ -5,6 +5,7 @@ app:
   kibana: http://kibana.host
 snapshot:
   host: https://localhost:9200/
+  name: recoverer
 # use this fields if elastic requires BA
   username: admin
   password: admin
@@ -16,8 +17,12 @@ snapshot:
   include_system: false
 search:
   host: https://localhost:9200/
+  name: opensearch
 # use this fields if elastic requires BA
   username: admin
   password: admin
   ssl: false
   insecure: true
+  file_limit:
+    rows: 1000000
+    size: 5G

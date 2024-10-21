@@ -63,6 +63,7 @@ type apiRequest struct {
 		Xql         string            `json:"xql,omitempty"`
 		Fields      []string          `json:"fields,omitempty"`
 		Filters     map[string]Filter `json:"filters,omitempty"`
+		Mapping     []string          `json:"mapping,omitempty"`
 		Timefields  []string          `json:"timefields,omitempty"`
 		DateStart   string            `json:"date_start,omitempty"`
 		DateEnd     string            `json:"date_end,omitempty"`
@@ -140,6 +141,21 @@ type snapList []struct {
 	Start_epoch string `json:"start_epoch,omitempty"`
 }
 
+type scrollResponse struct {
+	ScrollID string `json:"_scroll_id,omitempty"`
+	HitsRoot Hits   `json:"hits"`
+}
+
+type Hits struct {
+	Hits     []Hit   `json:"hits"`
+	MaxScore float64 `json:"max_score"`
+}
+
+type Hit struct {
+	Source map[string]interface{} `json:"_source,omitempty"`
+	Fields map[string]interface{} `json:"fields,omitempty"`
+}
+
 type IndicesInSnap map[string]*IndexInSnap
 
 func Run(cnf config.Config) {
@@ -170,25 +186,25 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.Contains(file, "/data/") {
-		wdir, err := os.Getwd()
+		/*wdir, err := os.Getwd()
 		if err != nil {
 			log.Println(err)
-		}
+		}*/
 
-		fi, err := os.Lstat(wdir + file)
+		fi, err := os.Lstat("/tmp" + file)
 		if err != nil {
 			http.Error(w, err.Error(), 404)
 			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
 			return
 		}
 
-		bytes, err := getFile(wdir+file, fi.Size())
+		bytes, err := getFile("/tmp"+file, fi.Size())
 		if err != nil {
 			http.Error(w, err.Error(), 404)
 			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
 			return
 		}
-		contentType := mime.TypeByExtension(path.Ext(wdir + file))
+		contentType := mime.TypeByExtension(path.Ext("/tmp" + file))
 
 		w.Header().Set("Content-Type", contentType)
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -599,17 +615,19 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "search":
 		{
-			var use_source string
-			var query string
-			var filters string
-			var must_not string
-			var xql string
-			var full_query string
-			var timefield string
-			var sort string
-			var tf string
-			var fields string
-			var req map[string]interface{}
+			var (
+				use_source string
+				query      string
+				filters    string
+				must_not   string
+				xql        string
+				full_query string
+				timefield  string
+				sort       string
+				tf         string
+				fields     string
+				req        map[string]interface{}
+			)
 
 			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
 			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
@@ -666,6 +684,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				w.Write(cresponse)
 			} else {
 				_ = json.Unmarshal([]byte(full_query), &req)
+				fmt.Println(full_query)
 				sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search", req, "Search")
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -677,35 +696,37 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-	case "download":
+	case "prepare_csv":
 		{
-			path, err := os.Getwd()
-			if err != nil {
-				log.Println(err)
-			}
-			allocateSpaceForFile(path+"/data/"+request.Search.Fname+".csv", 100)
-			/*var use_source string
-			var query string
-			var filters string
-			var must_not string
-			var xql string
-			var full_query string
-			var timefield string
-			var sort string
-			var tf string
-			var fields string
-			var req map[string]interface{}
+			//allocateSpaceForFile("/tmp/data/"+request.Search.Fname+".csv", 100)
+			var (
+				use_source     string
+				query          string
+				filters        string
+				must_not       string
+				xql            string
+				full_query     string
+				timefield      string
+				sort           string
+				tf             string
+				fields         string
+				req            map[string]interface{}
+				scrollresponse scrollResponse
+				fields_list    []string
+			)
 
-			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateStart+" (MSK)")
-			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Values.DateEnd+" (MSK)")
+			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
+			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
 
-			if len(request.Values.Fields) == 0 {
+			if len(request.Search.Fields) == 0 {
 				use_source = `"_source": true`
+				fields_list = request.Search.Mapping
 			} else {
 				use_source = `"_source": false`
+				fields_list = request.Search.Fields
 			}
 
-			for _, f := range request.Values.Filters {
+			for _, f := range request.Search.Filters {
 
 				if f.Operation == "is" {
 					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
@@ -720,12 +741,12 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			filters += `{"match_all": {}}`
 			must_not, _ = strings.CutSuffix(must_not, ",")
 
-			if request.Values.Xql != "" {
-				xql = `{ "simple_query_string": { "query": "` + request.Values.Xql + `" } }`
+			if request.Search.Xql != "" {
+				xql = `{ "simple_query_string": { "query": "` + request.Search.Xql + `" } }`
 			}
-			if len(request.Values.Timefields) > 0 {
-				timefield = request.Values.Timefields[0]
-				fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Values.Fields, "\", \"") + `" ]`
+			if len(request.Search.Timefields) > 0 {
+				timefield = request.Search.Timefields[0]
+				fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
 				sort = `"sort": [ {"` + timefield + `": "desc" } ]`
 				tf = `{ "range": { "` + timefield + `": {
 						   "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
@@ -734,32 +755,85 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				sort = ""
 				tf = ""
-				fields = `"fields": ["` + strings.Join(request.Values.Fields, "\", \"") + `" ]`
+				fields = `"fields": ["` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
 			}
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
-			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
+			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
 
-			if request.Values.Count {
-				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
-				cresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_count", req, "Search")
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
-					return
-				}
-				w.Write(cresponse)
-			} else {
-				_ = json.Unmarshal([]byte(full_query), &req)
-				sresponse, err := rt.doPost(request.Values.Cluster+request.Values.Index+"/_search", req, "Search")
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
-					return
-				}
-				w.Write(sresponse)
+			_ = json.Unmarshal([]byte(full_query), &req)
+			sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search?scroll=10m", req, "Search")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
 			}
-			*/
+
+			f, err := os.OpenFile("/tmp/data/"+request.Search.Fname+".csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+
+			if len(request.Search.Timefields) > 0 {
+				f.WriteString(request.Search.Timefields[0] + `;` + strings.Join(fields_list, ";") + "\n")
+			} else {
+				f.WriteString(strings.Join(fields_list, ";") + "\n")
+			}
+
+			_ = json.Unmarshal(sresponse, &scrollresponse)
+			if len(scrollresponse.HitsRoot.Hits) > 0 {
+				for _, row := range scrollresponse.HitsRoot.Hits {
+					if len(request.Search.Fields) == 0 {
+						f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
+					} else {
+						f.WriteString(fmt.Sprintf("%v;", row.Fields[request.Search.Timefields[0]]))
+					}
+					for _, fm := range fields_list {
+						if len(request.Search.Fields) == 0 {
+							f.WriteString(fmt.Sprintf("%v;", row.Source[fm]))
+						} else {
+							f.WriteString(fmt.Sprintf("%v;", row.Fields[fm]))
+						}
+					}
+					f.WriteString("\n")
+				}
+			}
+
+			if scrollresponse.ScrollID != "" {
+				scroll := map[string]interface{}{"scroll": "10m", "scroll_id": scrollresponse.ScrollID}
+				for i := 0; i < helpers.Atoi(rt.conf.Search.FileLimit.Rows)/10000; i++ {
+					sresponse, err := rt.doPost(request.Search.Cluster+"_search/scroll", scroll, "Search")
+					if err != nil {
+						log.Println("Failed to get scroll batch: ", err)
+						return
+					}
+					_ = json.Unmarshal(sresponse, &scrollresponse)
+					if len(scrollresponse.HitsRoot.Hits) == 0 {
+						_, _ = rt.doDel(request.Search.Cluster+"_search/scroll/"+scrollresponse.ScrollID, "Search")
+						break
+					}
+					if len(scrollresponse.HitsRoot.Hits) > 0 {
+						for _, row := range scrollresponse.HitsRoot.Hits {
+							if len(request.Search.Fields) == 0 {
+								f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
+							} else {
+								f.WriteString(fmt.Sprintf("%v;", row.Fields[request.Search.Timefields[0]]))
+							}
+							for _, fm := range fields_list {
+								if len(request.Search.Fields) == 0 {
+									f.WriteString(fmt.Sprintf("%v;", row.Source[fm]))
+								} else {
+									f.WriteString(fmt.Sprintf("%v;", row.Fields[fm]))
+								}
+							}
+							f.WriteString("\n")
+						}
+					}
+				}
+
+			}
+
 		}
 
 	default:
@@ -770,16 +844,5 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 
-	}
-}
-
-func allocateSpaceForFile(path string, size int64) {
-	f, err := os.Create(path)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err := f.Truncate(size); err != nil {
-		log.Fatal(err)
 	}
 }

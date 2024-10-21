@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 
@@ -300,4 +301,15 @@ func getFile(fname string, size int64) ([]byte, error) {
 	bytes := make([]byte, size)
 	respFile.Read(bytes)
 	return bytes, nil
+}
+
+func allocateSpaceForFile(path string, size int64) {
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := f.Truncate(size); err != nil {
+		log.Fatal(err)
+	}
 }

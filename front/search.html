@@ -67,7 +67,7 @@ mark {
                   <button type="button" class="btn btn-primary btn-sm" id="search">Search</button>
                 </div>
                 <div class="col">
-                  <button type="button" class="btn btn-success btn-sm" id="download" disabled>Xtract it</button>
+                  <button type="button" class="btn btn-success btn-sm" id="xtract_csv" disabled>Xtract it</button>
                   <span id="download_link"></span>
                 </div>
               </div>
@@ -83,7 +83,7 @@ mark {
                 <li> Выбираем промежуток времени</li>
                 <li> При необходимости задаем фильтры</li>
                 <li> В поисковой строке можно указать ключевые слова для поиска</li>
-                <li> Если полученый результат(500 шзаписей максимум) устраивает - нажимаем Xtract it</li>
+                <li> Если полученый результат(500 записей максимум) устраивает - нажимаем Xtract it</li>
               </ul>
             </div>
           </span>
@@ -532,10 +532,10 @@ $("#search").click(function(){
             str+="</tr>";
           }
           str+="</tbody></table>";
-        $("#download").prop('disabled', false);
+        $("#xtract_csv").prop('disabled', false);
         } else {
           str = "<h3>No search results found</h3>";
-          $("#download").prop('disabled', true);
+          $("#xtract_csv").prop('disabled', true);
         }
         $("#result").html(str);
       },
@@ -547,9 +547,9 @@ $("#search").click(function(){
     //event.preventDefault();
 });
 
-$("#download").click(function(){
+$("#xtract_csv").click(function(){
     $("#loading").removeClass('invisible');
-    fname = (Math.random() + 1).toString(36).substring(7);
+    fname = (Math.random() + 1).toString(36).substring(4);
     fields = []
     tf = []
     xql = $('#xql').val()
@@ -564,10 +564,11 @@ $("#download").click(function(){
     });
 
     var post = {
-      "action": "download",
+      "action": "prepare_csv",
       "search" : {
         "index": $('#igs').val(),
         "fields": fields,
+        "mapping": mapping,
         "filters": filters_set,
         "timefields": tf,
         "cluster": $('#cluster').val(),

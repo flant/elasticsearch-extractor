@@ -31,7 +31,7 @@ type Config struct {
 	} `yaml:"app"`
 	Snapshot struct {
 		Host               string `yaml:"host"`
-		Name               string
+		Name               string `yaml:"name,omitempty"`
 		SSL                bool   `yaml:"ssl"`
 		Username           string `yaml:"username"`
 		Password           string `yaml:"password"`
@@ -44,7 +44,7 @@ type Config struct {
 	} `yaml:"snapshot"`
 	Search struct {
 		Host               string `yaml:"host,omitempty"`
-		Name               string
+		Name               string `yaml:"name,omitempty"`
 		SSL                bool   `yaml:"ssl,omitempty"`
 		Username           string `yaml:"username,omitempty"`
 		Password           string `yaml:"password,omitempty"`
@@ -52,6 +52,10 @@ type Config struct {
 		ClientCert         string `yaml:"client_cert,omitempty"`
 		ClientKey          string `yaml:"client_key,omitempty"`
 		InsecureSkipVerify bool   `yaml:"insecure,omitempty"`
+		FileLimit          struct {
+			Rows string
+			Size string
+		} `yaml:"file_limit,omitempty"`
 	} `yaml:"search,omitempty"`
 }
 
@@ -86,14 +90,18 @@ func Parse(f string) Config {
 	if c.Snapshot.Host == "" {
 		c.Snapshot.Host = "http://127.0.0.1:9200/"
 	}
-	s0 := re.FindSubmatchIndex([]byte(c.Snapshot.Host))
-	c.Snapshot.Name = string(re.Expand([]byte{}, template, []byte(c.Snapshot.Host), s0))
+	if c.Snapshot.Name == "" {
+		s0 := re.FindSubmatchIndex([]byte(c.Snapshot.Host))
+		c.Snapshot.Name = string(re.Expand([]byte{}, template, []byte(c.Snapshot.Host), s0))
+	}
 
 	if c.Search.Host == "" {
 		c.Search.Host = "http://127.0.0.1:9200/"
 	}
-	s1 := re.FindSubmatchIndex([]byte(c.Search.Host))
-	c.Search.Name = string(re.Expand([]byte{}, template, []byte(c.Search.Host), s1))
+	if c.Search.Name == "" {
+		s1 := re.FindSubmatchIndex([]byte(c.Search.Host))
+		c.Search.Name = string(re.Expand([]byte{}, template, []byte(c.Search.Host), s1))
+	}
 
 	return c
 }
