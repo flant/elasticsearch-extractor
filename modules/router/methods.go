@@ -18,11 +18,13 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 
 	"bytes"
 	"net"
-
+	"regexp"
 	"time"
 
 	"github.com/uzhinskiy/lib.go/helpers"
@@ -41,8 +43,8 @@ type esError struct {
 }
 
 func (rt *Router) netClientPrepare() {
-	tlsClientConfig := createTLSConfig(rt.conf.Elastic.CAcert, rt.conf.Elastic.ClientCert,
-		rt.conf.Elastic.ClientKey, rt.conf.Elastic.InsecureSkipVerify)
+	tlsClientConfig := createTLSConfig(rt.conf.Snapshot.CAcert, rt.conf.Snapshot.ClientCert,
+		rt.conf.Snapshot.ClientKey, rt.conf.Snapshot.InsecureSkipVerify)
 	var netTransport = &http.Transport{
 		Dial: (&net.Dialer{
 			Timeout: time.Duration(rt.conf.App.TimeOut) * time.Second,
@@ -50,23 +52,46 @@ func (rt *Router) netClientPrepare() {
 		TLSClientConfig: tlsClientConfig,
 	}
 
-	rt.nc = &http.Client{
+	rt.nc["Snapshot"] = &http.Client{
 		Timeout:   time.Second * time.Duration(rt.conf.App.TimeOut),
 		Transport: netTransport,
 	}
+
+	if rt.conf.Search.Host != "" {
+		tlsClientConfig := createTLSConfig(rt.conf.Search.CAcert, rt.conf.Search.ClientCert,
+			rt.conf.Search.ClientKey, rt.conf.Search.InsecureSkipVerify)
+		var netTransport = &http.Transport{
+			Dial: (&net.Dialer{
+				Timeout: time.Duration(rt.conf.App.TimeOut) * time.Second,
+			}).Dial,
+			TLSClientConfig: tlsClientConfig,
+		}
+
+		rt.nc["Search"] = &http.Client{
+			Timeout:   time.Second * time.Duration(rt.conf.App.TimeOut),
+			Transport: netTransport,
+		}
+
+	}
+
 }
 
-func (rt *Router) doDel(url string) ([]byte, error) {
+func (rt *Router) doDel(url string, cluster string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("DELETE", url, nil)
-	if rt.conf.Elastic.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
-	}
-
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
+	if cluster == "Search" {
+		if rt.conf.Search.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Search.Username, rt.conf.Search.Password)
+		}
+	} else {
+		if rt.conf.Snapshot.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
+		}
+	}
 
-	actionResult, err := rt.nc.Do(actionRequest)
+	actionResult, err := rt.nc[cluster].Do(actionRequest)
 	if actionResult != nil {
 		defer actionResult.Body.Close()
 	}
@@ -86,17 +111,22 @@ func (rt *Router) doDel(url string) ([]byte, error) {
 	return body, nil
 }
 
-func (rt *Router) doGet(url string) ([]byte, error) {
+func (rt *Router) doGet(url string, cluster string) ([]byte, error) {
 
 	actionRequest, _ := http.NewRequest("GET", url, nil)
-	if rt.conf.Elastic.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
-	}
-
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 
-	actionResult, err := rt.nc.Do(actionRequest)
+	if cluster == "Search" {
+		if rt.conf.Search.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Search.Username, rt.conf.Search.Password)
+		}
+	} else {
+		if rt.conf.Snapshot.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
+		}
+	}
+	actionResult, err := rt.nc[cluster].Do(actionRequest)
 	if actionResult != nil {
 		defer actionResult.Body.Close()
 	}
@@ -116,18 +146,26 @@ func (rt *Router) doGet(url string) ([]byte, error) {
 	return body, nil
 }
 
-func (rt *Router) doPost(url string, request map[string]interface{}) ([]byte, error) {
+func (rt *Router) doPost(url string, request map[string]interface{}, cluster string) ([]byte, error) {
 	toBackend, _ := json.Marshal(request)
 
 	actionRequest, _ := http.NewRequest("POST", url, bytes.NewReader(toBackend))
-	if rt.conf.Elastic.Username != "" {
-		actionRequest.SetBasicAuth(rt.conf.Elastic.Username, rt.conf.Elastic.Password)
-	}
 
 	actionRequest.Header.Set("Content-Type", "application/json")
 	actionRequest.Header.Set("Connection", "keep-alive")
 
-	actionResult, err := rt.nc.Do(actionRequest)
+	if cluster == "Search" {
+		if rt.conf.Search.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Search.Username, rt.conf.Search.Password)
+		}
+
+	} else {
+		if rt.conf.Snapshot.Username != "" {
+			actionRequest.SetBasicAuth(rt.conf.Snapshot.Username, rt.conf.Snapshot.Password)
+		}
+	}
+
+	actionResult, err := rt.nc[cluster].Do(actionRequest)
 	if actionResult != nil {
 		defer actionResult.Body.Close()
 	}
@@ -157,7 +195,7 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 	//	rt.nodes.RLock()
 	//	defer rt.nodes.RUnlock()
 
-	response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name")
+	response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/nodes?format=json&bytes=b&h=ip,name,dt,du,dup,d&s=name", "Snapshot")
 	if err != nil {
 		return nil, err
 	}
@@ -176,6 +214,32 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 	na.max = helpers.GetMaxValueInArray(na.list)
 	rt.nodes = na
 	return nresp, nil
+
+}
+
+func (rt *Router) getIndexGroups() ([]indexGroup, error) {
+	var igs, igresp []indexGroup
+
+	re := regexp.MustCompile(`^([\w\d\-_]+)-(\d{4}\.\d{2}\.\d{2}(-\d{2})*)`)
+
+	//	rt.nodes.RLock()
+	//	defer rt.nodes.RUnlock()
+	t := time.Now()
+	response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/indices/*-"+t.Format("2006.01.02")+"*,-.*/?format=json&h=index", "Search")
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(response, &igs)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range igs {
+		match := re.FindStringSubmatch(n.Index)
+		n.Index = match[1] + "-*"
+		igresp = append(igresp, n)
+	}
+
+	return igresp, nil
 
 }
 
@@ -206,4 +270,46 @@ func (rt *Router) Barrel(ind_array IndicesInSnap, s3 bool) ([]string, []string) 
 		}
 	}
 	return a, b
+}
+
+func (rt *Router) flattenMap(prefix string, nestedMap map[string]interface{}, flatMap map[string]string) {
+	for key, value := range nestedMap {
+		fullKey := key
+		if prefix != "" {
+			fullKey = prefix + "." + key
+		}
+
+		if subMap, ok := value.(map[string]interface{}); ok {
+			if typeVal, exists := subMap["type"]; exists {
+				flatMap[fullKey] = typeVal.(string)
+			}
+
+			if props, hasProps := subMap["properties"]; hasProps {
+				rt.flattenMap(fullKey, props.(map[string]interface{}), flatMap)
+			}
+		}
+	}
+}
+
+func getFile(fname string, size int64) ([]byte, error) {
+	respFile, err := os.OpenFile(fname, os.O_RDONLY, 0)
+
+	defer respFile.Close()
+	if err != nil {
+		return nil, err
+	}
+	bytes := make([]byte, size)
+	respFile.Read(bytes)
+	return bytes, nil
+}
+
+func allocateSpaceForFile(path string, size int64) {
+	f, err := os.Create(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := f.Truncate(size); err != nil {
+		log.Fatal(err)
+	}
 }

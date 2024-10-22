@@ -16,6 +16,7 @@ package config
 import (
 	"io/ioutil"
 	"log"
+	"regexp"
 
 	"gopkg.in/yaml.v2"
 )
@@ -28,8 +29,9 @@ type Config struct {
 		TimeOut    int    `yaml:"-"`
 		TimeOutRaw *int   `yaml:"timeout"`
 	} `yaml:"app"`
-	Elastic struct {
+	Snapshot struct {
 		Host               string `yaml:"host"`
+		Name               string `yaml:"name,omitempty"`
 		SSL                bool   `yaml:"ssl"`
 		Username           string `yaml:"username"`
 		Password           string `yaml:"password"`
@@ -39,11 +41,31 @@ type Config struct {
 		InsecureSkipVerify bool   `yaml:"insecure"`
 		Include            bool   `yaml:"include_system"`
 		IsS3               bool   `yaml:"is_s3"`
-	} `yaml:"elastic"`
+	} `yaml:"snapshot"`
+	Search struct {
+		Host               string `yaml:"host,omitempty"`
+		Name               string `yaml:"name,omitempty"`
+		SSL                bool   `yaml:"ssl,omitempty"`
+		Username           string `yaml:"username,omitempty"`
+		Password           string `yaml:"password,omitempty"`
+		CAcert             string `yaml:"ca_cert,omitempty"`
+		ClientCert         string `yaml:"client_cert,omitempty"`
+		ClientKey          string `yaml:"client_key,omitempty"`
+		InsecureSkipVerify bool   `yaml:"insecure,omitempty"`
+		FileLimit          struct {
+			Rows    int    `yaml:"-"`
+			RowsRaw *int   `yaml:"rows,omitempty"`
+			Size    int64  `yaml:"-"`
+			SizeRaw *int64 `yaml:"size,omitempty"`
+		} `yaml:"file_limit,omitempty"`
+	} `yaml:"search,omitempty"`
 }
 
 func Parse(f string) Config {
 	var c Config
+	var re = regexp.MustCompile(`(?m)^https*://(?P<host>[\w\d-\._]+)*:*[\d]*/*$`)
+	template := []byte("$host\n")
+
 	yamlBytes, err := ioutil.ReadFile(f)
 	if err != nil {
 		log.Fatal(err)
@@ -67,8 +89,30 @@ func Parse(f string) Config {
 		c.App.TimeOut = *c.App.TimeOutRaw
 	}
 
-	if c.Elastic.Host == "" {
-		c.Elastic.Host = "http://127.0.0.1:9200/"
+	if c.Snapshot.Host == "" {
+		c.Snapshot.Host = "http://127.0.0.1:9200/"
+	}
+	if c.Snapshot.Name == "" {
+		s0 := re.FindSubmatchIndex([]byte(c.Snapshot.Host))
+		c.Snapshot.Name = string(re.Expand([]byte{}, template, []byte(c.Snapshot.Host), s0))
+	}
+
+	if c.Search.Host == "" {
+		c.Search.Host = "http://127.0.0.1:9200/"
+	}
+	if c.Search.Name == "" {
+		s1 := re.FindSubmatchIndex([]byte(c.Search.Host))
+		c.Search.Name = string(re.Expand([]byte{}, template, []byte(c.Search.Host), s1))
+	}
+
+	c.Search.FileLimit.Rows = 1000000
+	if c.Search.FileLimit.RowsRaw != nil {
+		c.Search.FileLimit.Rows = *c.Search.FileLimit.RowsRaw
+	}
+
+	c.Search.FileLimit.Size = 5 * 1024 * 1024 * 1024
+	if c.Search.FileLimit.SizeRaw != nil {
+		c.Search.FileLimit.Size = *c.Search.FileLimit.SizeRaw * 1024 * 1024 * 1024
 	}
 
 	return c

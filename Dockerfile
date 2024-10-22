@@ -7,7 +7,8 @@ RUN mkdir -p /go/src/extractor
 ADD . /go/src/extractor
 
 # Build binary
-RUN go get -u github.com/jteeuwen/go-bindata/...
+#RUN go get -u github.com/jteeuwen/go-bindata/...
+RUN go install github.com/jteeuwen/go-bindata@latest
 RUN cd /go/src/extractor/ && make
 
 # stage 2: lightweight "release"

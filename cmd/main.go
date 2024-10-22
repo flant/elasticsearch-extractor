@@ -14,10 +14,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"log"
 	"os"
 
+	"github.com/flant/elasticsearch-extractor/modules/cleanup"
 	"github.com/flant/elasticsearch-extractor/modules/config"
 	"github.com/flant/elasticsearch-extractor/modules/router"
 	"github.com/flant/elasticsearch-extractor/modules/version"
@@ -48,8 +50,16 @@ func init() {
 
 	cnf = config.Parse(configfile)
 	log.Println("Bootstrap: successful parsing config file. Items: ", cnf)
+	if _, err := os.Stat("/tmp/data"); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir("/tmp/data", os.ModePerm)
+		if err != nil {
+			log.Fatalf("cannot create directory: %s\n", err)
+		}
+	}
+
 }
 
 func main() {
+	go cleanup.Run()
 	router.Run(cnf)
 }

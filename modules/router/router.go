@@ -19,7 +19,9 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"path"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -33,9 +35,15 @@ import (
 	"github.com/uzhinskiy/lib.go/helpers"
 )
 
+type Filter struct {
+	Field     string `json:"field,omitempty"`
+	Operation string `json:"operation,omitempty"`
+	Value     string `json:"value,omitempty"`
+}
+
 type Router struct {
 	conf  config.Config
-	nc    *http.Client
+	nc    map[string]*http.Client
 	nodes nodesArray
 	sl    snapList
 }
@@ -50,6 +58,20 @@ type apiRequest struct {
 		Snapshot  string   `json:"snapshot,omitempty"`
 		Index     string   `json:"index,omitempty"`
 	} `json:"values,omitempty"`
+	Search struct {
+		Index       string            `json:"index,omitempty"`
+		Cluster     string            `json:"cluster,omitempty"`
+		Xql         string            `json:"xql,omitempty"`
+		Fields      []string          `json:"fields,omitempty"`
+		Filters     map[string]Filter `json:"filters,omitempty"`
+		Mapping     []string          `json:"mapping,omitempty"`
+		Timefields  []string          `json:"timefields,omitempty"`
+		DateStart   string            `json:"date_start,omitempty"`
+		DateEnd     string            `json:"date_end,omitempty"`
+		SearchAfter string            `json:"search_after,omitempty"`
+		Count       bool              `json:"count,omitempty"`
+		Fname       string            `json:"fname,omitempty"`
+	} `json:"search,omitempty"`
 }
 
 type snapStatus struct {
@@ -104,6 +126,15 @@ type IndexInSnap struct {
 	Shards []int
 }
 
+type indexGroup struct {
+	Index string `json:"index,omitempty"`
+}
+
+type Cluster struct {
+	Name string
+	Host string
+}
+
 type snapList []struct {
 	Id          string `json:"id,omitempty"`
 	Status      string `json:"status,omitempty"`
@@ -111,11 +142,27 @@ type snapList []struct {
 	Start_epoch string `json:"start_epoch,omitempty"`
 }
 
+type scrollResponse struct {
+	ScrollID string `json:"_scroll_id,omitempty"`
+	HitsRoot Hits   `json:"hits"`
+}
+
+type Hits struct {
+	Hits     []Hit   `json:"hits"`
+	MaxScore float64 `json:"max_score"`
+}
+
+type Hit struct {
+	Source map[string]interface{} `json:"_source,omitempty"`
+	Fields map[string]interface{} `json:"fields,omitempty"`
+}
+
 type IndicesInSnap map[string]*IndexInSnap
 
 func Run(cnf config.Config) {
 	rt := Router{}
 	rt.conf = cnf
+	rt.nc = make(map[string]*http.Client)
 	rt.netClientPrepare()
 	_, err := rt.getNodes()
 	if err != nil {
@@ -130,10 +177,43 @@ func Run(cnf config.Config) {
 // web-ui
 func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 	file := r.URL.Path
+
 	remoteIP := helpers.GetIP(r.RemoteAddr, r.Header.Get("X-Real-IP"), r.Header.Get("X-Forwarded-For"))
 	if file == "/" {
 		file = "/index.html"
 	}
+	if file == "/search/" {
+		file = "/search.html"
+	}
+
+	if strings.Contains(file, "/data/") {
+		/*wdir, err := os.Getwd()
+		if err != nil {
+			log.Println(err)
+		}*/
+
+		fi, err := os.Lstat("/tmp" + file)
+		if err != nil {
+			http.Error(w, err.Error(), 404)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
+			return
+		}
+
+		bytes, err := getFile("/tmp"+file, fi.Size())
+		if err != nil {
+			http.Error(w, err.Error(), 404)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
+			return
+		}
+		contentType := mime.TypeByExtension(path.Ext("/tmp" + file))
+
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("X-Server", version.Version)
+		w.Write(bytes)
+		return
+	}
+
 	cFile := strings.Replace(file, "/", "", 1)
 	data, err := front.Asset(cFile)
 	if err != nil {
@@ -188,7 +268,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	switch request.Action {
 	case "get_repositories":
 		{
-			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/repositories?format=json")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/repositories?format=json", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -211,7 +291,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "get_indices":
 		{
-			response, err := rt.doGet(rt.conf.Elastic.Host + "extracted*/_recovery/")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"extracted*/_recovery/", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -229,7 +309,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusBadRequest, "\t", msg)
 				return
 			}
-			response, err := rt.doDel(rt.conf.Elastic.Host + request.Values.Index)
+			response, err := rt.doDel(rt.conf.Snapshot.Host+request.Values.Index, "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -248,7 +328,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			response, err := rt.doGet(rt.conf.Elastic.Host + "_cat/snapshots/" + request.Values.Repo + "?format=json")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/snapshots/"+request.Values.Repo+"?format=json", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -263,7 +343,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			if !rt.conf.Elastic.Include {
+			if !rt.conf.Snapshot.Include {
 				j := 0
 				for _, n := range snap_list {
 					matched, err := regexp.MatchString(`^[\.]\S+`, n.Id)
@@ -364,7 +444,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			status_response, err := rt.doGet(rt.conf.Elastic.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
+			status_response, err := rt.doGet(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_status", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -390,7 +470,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			status_response, err := rt.doGet(rt.conf.Elastic.Host + "_snapshot/" + request.Values.Repo + "/" + request.Values.Snapshot + "/_status")
+			status_response, err := rt.doGet(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_status", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -417,7 +497,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Elastic.IsS3)
+			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Snapshot.IsS3)
 			t := time.Now()
 			req := map[string]interface{}{
 				"ignore_unavailable":   false,
@@ -429,7 +509,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				"index_settings":       map[string]interface{}{"index.number_of_replicas": 0},
 			}
 
-			response, err := rt.doPost(rt.conf.Elastic.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req)
+			response, err := rt.doPost(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/"+request.Values.Snapshot+"/_restore?wait_for_completion=false", req, "Snapshot")
 			if err != nil {
 				msg := fmt.Sprintf(`{"error":"%s"}`, err)
 				http.Error(w, msg, 500)
@@ -450,7 +530,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							"title":         "extracted_v3-*",
 							"timeFieldName": "timestamp"}}
 
-					ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:v3-080", ip_req)
+					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:v3-080", ip_req, "Snapshot")
 					if err != nil {
 						msg := fmt.Sprintf(`{"error":"%s"}`, err)
 						http.Error(w, msg, 500)
@@ -463,7 +543,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							"title":         "extracted_*",
 							"timeFieldName": "@timestamp"}}
 
-					ip_resp, err := rt.doPost(rt.conf.Elastic.Host+".kibana/_doc/index-pattern:080", ip_req)
+					ip_resp, err := rt.doPost(rt.conf.Snapshot.Host+".kibana/_doc/index-pattern:080", ip_req, "Snapshot")
 					if err != nil {
 						msg := fmt.Sprintf(`{"error":"%s"}`, err)
 						http.Error(w, msg, 500)
@@ -475,6 +555,354 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)
 			w.Write([]byte(msg))
+
+		}
+		/*  ---- search --- */
+	case "get_index_groups":
+		{
+			response, err := rt.getIndexGroups()
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			j, _ := json.Marshal(response)
+			w.Write(j)
+		}
+
+	case "get_mapping":
+		{
+			t := time.Now()
+			var (
+				fullm map[string]interface{}
+				m     map[string]interface{}
+			)
+
+			flatMap := make(map[string]string)
+			response, err := rt.doGet(request.Search.Cluster+request.Search.Index+t.Format("2006.01.02")+"/_mapping", "Search")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+
+			err = json.Unmarshal(response, &fullm)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			for _, v := range fullm {
+				m = v.(map[string]interface{})
+			}
+
+			if mapping, hasMap := m["mappings"]; hasMap {
+				rt.flattenMap("", mapping.(map[string]interface{})["properties"].(map[string]interface{}), flatMap)
+			}
+
+			j, _ := json.Marshal(flatMap)
+
+			w.Write(j)
+		}
+
+	case "get_clusters":
+		{
+			var cl []Cluster
+			cl = append(cl, Cluster{rt.conf.Snapshot.Name, rt.conf.Snapshot.Host})
+			cl = append(cl, Cluster{rt.conf.Search.Name, rt.conf.Search.Host})
+			j, _ := json.Marshal(cl)
+			w.Write(j)
+		}
+
+	case "search":
+		{
+			var (
+				use_source string
+				query      string
+				filters    string
+				must_not   string
+				xql        string
+				full_query string
+				timefield  string
+				sort       string
+				tf         string
+				fields     string
+				req        map[string]interface{}
+			)
+
+			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
+			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
+
+			if len(request.Search.Fields) == 0 {
+				use_source = `"_source": true`
+			} else {
+				use_source = `"_source": false`
+			}
+
+			for _, f := range request.Search.Filters {
+
+				if f.Operation == "is" {
+					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "exists" {
+					filters += `{ "exists": {"field":"` + f.Field + `" } },`
+				} else if f.Operation == "is_not" {
+					must_not += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "does_not_exists" {
+					must_not += `{ "exists": {"field":"` + f.Field + `" } },`
+				}
+			}
+			filters += `{"match_all": {}}`
+			must_not, _ = strings.CutSuffix(must_not, ",")
+
+			if request.Search.Xql != "" {
+				xql = `{ "simple_query_string": { "query": "` + request.Search.Xql + `" } }`
+			}
+			if len(request.Search.Timefields) > 0 {
+				timefield = request.Search.Timefields[0]
+				fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+				sort = `"sort": [ {"` + timefield + `": "desc" } ]`
+				tf = `{ "range": { "` + timefield + `": {
+						   "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
+						   "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
+						   "format": "strict_date_optional_time" } } },`
+			} else {
+				sort = ""
+				tf = ""
+				fields = `"fields": ["` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+			}
+			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
+
+			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
+
+			if request.Search.Count {
+				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
+				cresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_count", req, "Search")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+					return
+				}
+				w.Write(cresponse)
+			} else {
+				_ = json.Unmarshal([]byte(full_query), &req)
+				fmt.Println(full_query)
+				sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search", req, "Search")
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+					return
+				}
+				w.Write(sresponse)
+			}
+
+		}
+
+	case "prepare_csv":
+		{
+			//allocateSpaceForFile("/tmp/data/"+request.Search.Fname+".csv", 100)
+			var (
+				use_source     string
+				query          string
+				filters        string
+				must_not       string
+				xql            string
+				full_query     string
+				timefield      string
+				sort           string
+				tf             string
+				fields         string
+				req            map[string]interface{}
+				scrollresponse scrollResponse
+				fields_list    []string
+			)
+
+			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
+			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
+
+			if len(request.Search.Fields) == 0 {
+				use_source = `"_source": true`
+				fields_list = request.Search.Mapping
+			} else {
+				use_source = `"_source": false`
+				fields_list = request.Search.Fields
+			}
+
+			for _, f := range request.Search.Filters {
+
+				if f.Operation == "is" {
+					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "exists" {
+					filters += `{ "exists": {"field":"` + f.Field + `" } },`
+				} else if f.Operation == "is_not" {
+					must_not += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+				} else if f.Operation == "does_not_exists" {
+					must_not += `{ "exists": {"field":"` + f.Field + `" } },`
+				}
+			}
+			filters += `{"match_all": {}}`
+			must_not, _ = strings.CutSuffix(must_not, ",")
+
+			if request.Search.Xql != "" {
+				xql = `{ "simple_query_string": { "query": "` + request.Search.Xql + `" } }`
+			}
+			if len(request.Search.Timefields) > 0 {
+				timefield = request.Search.Timefields[0]
+				fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+				sort = `"sort": [ {"` + timefield + `": "desc" } ]`
+				tf = `{ "range": { "` + timefield + `": {
+						   "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
+						   "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
+						   "format": "strict_date_optional_time" } } },`
+			} else {
+				sort = ""
+				tf = ""
+				fields = `"fields": ["` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+			}
+			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
+
+			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
+
+			err = json.Unmarshal([]byte(full_query), &req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search?scroll=10m", req, "Search")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+
+			f, err := os.OpenFile("/tmp/data/"+request.Search.Fname+".csv", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer f.Close()
+
+			if len(request.Search.Timefields) > 0 {
+				f.WriteString(request.Search.Timefields[0] + `;` + strings.Join(fields_list, ";") + "\n")
+			} else {
+				f.WriteString(strings.Join(fields_list, ";") + "\n")
+			}
+
+			err = json.Unmarshal(sresponse, &scrollresponse)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+
+			if len(scrollresponse.HitsRoot.Hits) > 0 {
+				var data any
+				for _, row := range scrollresponse.HitsRoot.Hits {
+
+					fileInfo, err := os.Stat("/tmp/data/" + request.Search.Fname + ".csv")
+					if err != nil {
+						log.Println(err)
+						return
+					}
+
+					if fileInfo.Size() > rt.conf.Search.FileLimit.Size {
+						return
+					}
+					if len(request.Search.Fields) == 0 {
+						f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
+					} else {
+						f.WriteString(fmt.Sprintf("%v;", row.Fields[request.Search.Timefields[0]]))
+					}
+					for _, fm := range fields_list {
+						if len(request.Search.Fields) == 0 {
+							data = row.Source[fm]
+						} else {
+							data = row.Fields[fm]
+						}
+
+						if data == nil {
+							f.WriteString(fmt.Sprintf("%s;", "--"))
+						} else {
+							switch reflect.TypeOf(data).Kind() {
+							case reflect.Slice:
+								{
+									s := reflect.ValueOf(data)
+									f.WriteString(fmt.Sprintf("%v;", s.Index(0)))
+								}
+							default:
+								{
+									f.WriteString(fmt.Sprintf("%v;", data))
+								}
+							}
+
+						}
+
+					}
+					f.WriteString("\n")
+				}
+			}
+
+			if scrollresponse.ScrollID != "" {
+				scroll := map[string]interface{}{"scroll": "10m", "scroll_id": scrollresponse.ScrollID}
+				for i := 0; i < rt.conf.Search.FileLimit.Rows/10000; i++ {
+					sresponse, err := rt.doPost(request.Search.Cluster+"_search/scroll", scroll, "Search")
+					if err != nil {
+						log.Println("Failed to get scroll batch: ", err)
+						return
+					}
+					_ = json.Unmarshal(sresponse, &scrollresponse)
+					if len(scrollresponse.HitsRoot.Hits) == 0 {
+						_, _ = rt.doDel(request.Search.Cluster+"_search/scroll/"+scrollresponse.ScrollID, "Search")
+						break
+					}
+					if len(scrollresponse.HitsRoot.Hits) > 0 {
+
+						var data any
+						for _, row := range scrollresponse.HitsRoot.Hits {
+							fileInfo, err := os.Stat("/tmp/data/" + request.Search.Fname + ".csv")
+							if err != nil {
+								log.Println(err)
+								return
+							}
+							if fileInfo.Size() > rt.conf.Search.FileLimit.Size {
+								return
+							}
+
+							if len(request.Search.Fields) == 0 {
+								f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
+							} else {
+								f.WriteString(fmt.Sprintf("%v;", row.Fields[request.Search.Timefields[0]]))
+							}
+							for _, fm := range fields_list {
+								if len(request.Search.Fields) == 0 {
+									data = row.Source[fm]
+								} else {
+									data = row.Fields[fm]
+								}
+
+								if data == nil {
+									f.WriteString(fmt.Sprintf("%s;", "--"))
+								} else {
+									switch reflect.TypeOf(data).Kind() {
+									case reflect.Slice:
+										{
+											s := reflect.ValueOf(data)
+											f.WriteString(fmt.Sprintf("%v;", s.Index(0)))
+										}
+									default:
+										{
+											f.WriteString(fmt.Sprintf("%v;", data))
+										}
+									}
+
+								}
+							}
+							f.WriteString("\n")
+						}
+					}
+				}
+
+			}
+			w.Write([]byte("Done"))
 
 		}
 

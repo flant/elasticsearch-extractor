@@ -3,8 +3,9 @@ app:
   bind: 0.0.0.0
   timeout: 60
   kibana: http://kibana.host
-elastic:
+snapshot:
   host: https://localhost:9200/
+  name: recoverer
 # use this fields if elastic requires BA
   username: admin
   password: admin
@@ -14,3 +15,15 @@ elastic:
 # Видим-ли в списке снапшотов системые (.kibana* / .opendistro* )
 # значение по умолчанию = false, то-есть не видим
   include_system: false
+search:
+  host: https://localhost:9200/
+  name: opensearch
+# use this fields if elastic requires BA
+  username: admin
+  password: admin
+  ssl: false
+  insecure: true
+  file_limit:
+    rows: 1000000
+# size in Gigabytes
+    size: 5
