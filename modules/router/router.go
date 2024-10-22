@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -761,7 +762,12 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
 
-			_ = json.Unmarshal([]byte(full_query), &req)
+			err = json.Unmarshal([]byte(full_query), &req)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
 			sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search?scroll=10m", req, "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -781,9 +787,26 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				f.WriteString(strings.Join(fields_list, ";") + "\n")
 			}
 
-			_ = json.Unmarshal(sresponse, &scrollresponse)
+			err = json.Unmarshal(sresponse, &scrollresponse)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+
 			if len(scrollresponse.HitsRoot.Hits) > 0 {
+				var data any
 				for _, row := range scrollresponse.HitsRoot.Hits {
+
+					fileInfo, err := os.Stat("/tmp/data/" + request.Search.Fname + ".csv")
+					if err != nil {
+						log.Println(err)
+						return
+					}
+
+					if fileInfo.Size() > rt.conf.Search.FileLimit.Size {
+						return
+					}
 					if len(request.Search.Fields) == 0 {
 						f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
 					} else {
@@ -791,10 +814,28 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					for _, fm := range fields_list {
 						if len(request.Search.Fields) == 0 {
-							f.WriteString(fmt.Sprintf("%v;", row.Source[fm]))
+							data = row.Source[fm]
 						} else {
-							f.WriteString(fmt.Sprintf("%v;", strings.Join(row.Fields[fm], " ")))
+							data = row.Fields[fm]
 						}
+
+						if data == nil {
+							f.WriteString(fmt.Sprintf("%s;", "--"))
+						} else {
+							switch reflect.TypeOf(data).Kind() {
+							case reflect.Slice:
+								{
+									s := reflect.ValueOf(data)
+									f.WriteString(fmt.Sprintf("%v;", s.Index(0)))
+								}
+							default:
+								{
+									f.WriteString(fmt.Sprintf("%v;", data))
+								}
+							}
+
+						}
+
 					}
 					f.WriteString("\n")
 				}
@@ -802,7 +843,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			if scrollresponse.ScrollID != "" {
 				scroll := map[string]interface{}{"scroll": "10m", "scroll_id": scrollresponse.ScrollID}
-				for i := 0; i < helpers.Atoi(rt.conf.Search.FileLimit.Rows)/10000; i++ {
+				for i := 0; i < rt.conf.Search.FileLimit.Rows/10000; i++ {
 					sresponse, err := rt.doPost(request.Search.Cluster+"_search/scroll", scroll, "Search")
 					if err != nil {
 						log.Println("Failed to get scroll batch: ", err)
@@ -814,17 +855,45 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 						break
 					}
 					if len(scrollresponse.HitsRoot.Hits) > 0 {
+
+						var data any
 						for _, row := range scrollresponse.HitsRoot.Hits {
+							fileInfo, err := os.Stat("/tmp/data/" + request.Search.Fname + ".csv")
+							if err != nil {
+								log.Println(err)
+								return
+							}
+							if fileInfo.Size() > rt.conf.Search.FileLimit.Size {
+								return
+							}
+
 							if len(request.Search.Fields) == 0 {
 								f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
 							} else {
-								f.WriteString(fmt.Sprintf("%v;", strings.Join(row.Fields[request.Search.Timefields[0]], " ")))
+								f.WriteString(fmt.Sprintf("%v;", row.Fields[request.Search.Timefields[0]]))
 							}
 							for _, fm := range fields_list {
 								if len(request.Search.Fields) == 0 {
-									f.WriteString(fmt.Sprintf("%v;", row.Source[fm]))
+									data = row.Source[fm]
 								} else {
-									f.WriteString(fmt.Sprintf("%v;", strings.Join(row.Fields[fm], " ")))
+									data = row.Fields[fm]
+								}
+
+								if data == nil {
+									f.WriteString(fmt.Sprintf("%s;", "--"))
+								} else {
+									switch reflect.TypeOf(data).Kind() {
+									case reflect.Slice:
+										{
+											s := reflect.ValueOf(data)
+											f.WriteString(fmt.Sprintf("%v;", s.Index(0)))
+										}
+									default:
+										{
+											f.WriteString(fmt.Sprintf("%v;", data))
+										}
+									}
+
 								}
 							}
 							f.WriteString("\n")
@@ -833,6 +902,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 			}
+			w.Write([]byte("Done"))
 
 		}
 

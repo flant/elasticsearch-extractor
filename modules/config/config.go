@@ -53,8 +53,10 @@ type Config struct {
 		ClientKey          string `yaml:"client_key,omitempty"`
 		InsecureSkipVerify bool   `yaml:"insecure,omitempty"`
 		FileLimit          struct {
-			Rows string
-			Size string
+			Rows    int    `yaml:"-"`
+			RowsRaw *int   `yaml:"rows,omitempty"`
+			Size    int64  `yaml:"-"`
+			SizeRaw *int64 `yaml:"size,omitempty"`
 		} `yaml:"file_limit,omitempty"`
 	} `yaml:"search,omitempty"`
 }
@@ -101,6 +103,16 @@ func Parse(f string) Config {
 	if c.Search.Name == "" {
 		s1 := re.FindSubmatchIndex([]byte(c.Search.Host))
 		c.Search.Name = string(re.Expand([]byte{}, template, []byte(c.Search.Host), s1))
+	}
+
+	c.Search.FileLimit.Rows = 1000000
+	if c.Search.FileLimit.RowsRaw != nil {
+		c.Search.FileLimit.Rows = *c.Search.FileLimit.RowsRaw
+	}
+
+	c.Search.FileLimit.Size = 5 * 1024 * 1024 * 1024
+	if c.Search.FileLimit.SizeRaw != nil {
+		c.Search.FileLimit.Size = *c.Search.FileLimit.SizeRaw * 1024 * 1024 * 1024
 	}
 
 	return c

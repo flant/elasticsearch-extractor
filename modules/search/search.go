@@ -13,6 +13,5 @@
 
 package search
 
-func t() {
-
+func worker(id int, works <-chan WorkRequest, results chan<- WorkResponse) {
 }

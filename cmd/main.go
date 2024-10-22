@@ -19,10 +19,9 @@ import (
 	"log"
 	"os"
 
+	"github.com/flant/elasticsearch-extractor/modules/cleanup"
 	"github.com/flant/elasticsearch-extractor/modules/config"
 	"github.com/flant/elasticsearch-extractor/modules/router"
-
-	//"github.com/flant/elasticsearch-extractor/modules/search"
 	"github.com/flant/elasticsearch-extractor/modules/version"
 )
 
@@ -61,5 +60,6 @@ func init() {
 }
 
 func main() {
+	go cleanup.Run()
 	router.Run(cnf)
 }

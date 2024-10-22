@@ -25,4 +25,5 @@ search:
   insecure: true
   file_limit:
     rows: 1000000
-    size: 5G
+# size in Gigabytes
+    size: 5
