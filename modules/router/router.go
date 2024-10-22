@@ -793,7 +793,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 						if len(request.Search.Fields) == 0 {
 							f.WriteString(fmt.Sprintf("%v;", row.Source[fm]))
 						} else {
-							f.WriteString(fmt.Sprintf("%v;", row.Fields[fm]))
+							f.WriteString(fmt.Sprintf("%v;", strings.Join(row.Fields[fm], " ")))
 						}
 					}
 					f.WriteString("\n")
@@ -818,13 +818,13 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							if len(request.Search.Fields) == 0 {
 								f.WriteString(fmt.Sprintf("%v;", row.Source[request.Search.Timefields[0]]))
 							} else {
-								f.WriteString(fmt.Sprintf("%v;", row.Fields[request.Search.Timefields[0]]))
+								f.WriteString(fmt.Sprintf("%v;", strings.Join(row.Fields[request.Search.Timefields[0]], " ")))
 							}
 							for _, fm := range fields_list {
 								if len(request.Search.Fields) == 0 {
 									f.WriteString(fmt.Sprintf("%v;", row.Source[fm]))
 								} else {
-									f.WriteString(fmt.Sprintf("%v;", row.Fields[fm]))
+									f.WriteString(fmt.Sprintf("%v;", strings.Join(row.Fields[fm], " ")))
 								}
 							}
 							f.WriteString("\n")
