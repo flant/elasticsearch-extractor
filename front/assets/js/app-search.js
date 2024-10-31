@@ -1,5 +1,6 @@
 const date = new Date();
 var mapping = [];
+var fmapping = {};
 var filter_operation = ["is", "is_not", "exists", "does_not_exists"]
 var filters_set = {}
 date.setMinutes(date.getMinutes() - 15)
@@ -30,7 +31,7 @@ $(document).ready(function(){
     var post = {
       "action": "get_clusters"
     };
-
+    $('#mapping_filter').val('');
     $.ajax({
       type: "POST",
       url: "/api/",
@@ -96,18 +97,38 @@ $('#igs').on('change', function(e) {
         success: function (data) {
           var str = "";
           mapping = [];
+          fmapping = {};
+          $('#mapping_filter').val('');
+          str += "<ul class='list-group'>"
           for (var k in data) {
-            str += "<li class='list-group-item' style='word-wrap: break-word !important; word-break: break-word;'><input type='checkbox' name='fields' id='mapping"+k+"' data-type='" + data[k] + "' value='" + k + "'>&nbsp;<label for='mapping"+k+"'>"+ k + "</label>&nbsp;&nbsp;(" + data[k] + ")" +"</li>";
+//             <li class="list-group-item" style="">
+//             <input type="checkbox" name="fields" id="mappingkubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled" data-type="text" value="kubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled" >
+//             &nbsp;<label for="mappingkubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled" style="word-wrap: break-word !important;word-break: break-word;">kubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled&nbsp;&nbsp;(text)</label>
+//             </li>
+            str += "<li class='list-group-item' style='word-wrap: break-word !important; word-break: break-word;display: flex;align-items: flex-start;'><input type='checkbox' name='fields' id='mapping_"+k+"' data-type='" + data[k] + "' value='" + k + "' style='margin-top: 6px;'>&nbsp;<label for='mapping_"+k+"'>"+ k + "&nbsp;&nbsp;(" + data[k] + ")" +"</label></li>";
             mapping.push(k);
           }
+          fmapping = data;
+          str += "</ul>"
           $("#fields").html(str);
       }
     });
 });
 
+$('#mapping_filter').on('keypress', function(e) {
+  var str="";
+  str += "<ul class='list-group'>"
+  for (var k in fmapping) {
+    if (k.includes(e.target.value))
+      str += "<li class='list-group-item' style='word-wrap: break-word !important; word-break: break-word;display: flex;align-items: flex-start;'><input type='checkbox' name='fields' id='mapping_"+k+"' data-type='" + fmapping[k] + "' value='" + k + "' style='margin-top: 6px;'>&nbsp;<label for='mapping_"+k+"'>"+ k + "</label></li>";
+  }
+  str += "</ul>"
+  $("#fields").html(str);
+});
+
 $('#modal_add_filter').on('shown.bs.modal',function(e){
 
-    $('#add_filter_fieldlist').find('option')
+    $('#adl_filter_fieldlist').find('option')
     .remove()
     .end();
 
@@ -117,11 +138,11 @@ $('#modal_add_filter').on('shown.bs.modal',function(e){
 
     $('#add_filter_uuid').val((Math.random() + 1).toString(36).substring(7));
     
-    $('#add_filter_fieldlist').append(new Option("Select...", "",true,true));
+    //$('#add_filter_fieldlist').append(new Option("Select...", "",true,true));
     for (k in mapping) {
           optText = mapping[k];
           optValue = mapping[k];
-          $('#add_filter_fieldlist').append(new Option(optText, optValue,false,false));
+          $('#adl_filter_fieldlist').append(new Option(optText, optValue,false,false));
     }
     
     $('#add_filter_operation').append(new Option("Select...", "",true,true));
@@ -136,6 +157,7 @@ $('#modal_add_filter').on('shown.bs.modal',function(e){
 $("#add_filter_save").click(function(){
   var str = $("#filters").html();
   var btn_id = $("#add_filter_uuid").val()
+  
   if ($("#add_filter_operation").val()=="is") {
     str += "<button type='button' id='" + $("#add_filter_uuid").val() + "' class='btn filter' data-target='#modal_update_filter' data-toggle='modal' data-uuid='" + $("#add_filter_uuid").val() + "' data-field='" + $("#add_filter_fieldlist").val() + "' data-oper='is' data-value='"+$("#add_filter_value").val()+"'>" + $("#add_filter_fieldlist").val() + ":" + $("#add_filter_value").val() + "</button>";
   } else if ($("#add_filter_operation").val()=="is_not") {
@@ -189,7 +211,7 @@ $("#filters").on("click", "button.filter", function(e){
     $('#update_filter_uuid').val(filter_btn.attr("data-uuid"))
     $('#update_filter_value').val(filter_btn.attr("data-value"))
 
-    $('#update_filter_fieldlist').find('option')
+    $('#udl_filter_fieldlist').find('option')
     .remove()
     .end();
 
@@ -201,10 +223,9 @@ $("#filters").on("click", "button.filter", function(e){
       optText = mapping[k];
       optValue = mapping[k];
       if (optValue==filter_btn.attr("data-field")) {
-        $('#update_filter_fieldlist').append(new Option(optText, optValue,true,true));
-      } else {
-        $('#update_filter_fieldlist').append(new Option(optText, optValue,false,false));
+        $('#update_filter_fieldlist').val(optValue);
       }
+      $('#udl_filter_fieldlist').append(new Option(optText, optValue,false,false));
     }
 
     for (k in filter_operation) {
@@ -226,10 +247,12 @@ $("#search").click(function(){
     xql = $('#xql').val();
     indexOfLargestValue = 0;
     total = 0;
-    $("input[name='fields']").each(function() {
-      if (this.dataset.type=="date") {
-        tf.push(this.value)
+    for (var k in fmapping) {
+      if (fmapping[k] =="date") {
+        tf.push(k)
       }
+    }
+    $("input[name='fields']").each(function() {
       if (this.checked) {
         fields.push(this.value)
       }
@@ -368,10 +391,16 @@ $("#xtract_csv").click(function(){
     tf = []
     xql = $('#xql').val()
     indexOfLargestValue = 0
-    $("input[name='fields']").each(function() {
-      if (this.dataset.type=="date") {
-        tf.push(this.value)
+    for (var k in fmapping) {
+      if (fmapping[k] =="date") {
+        tf.push(k)
       }
+    }
+    
+    $("input[name='fields']").each(function() {
+//       if (this.dataset.type=="date") {
+//         tf.push(this.value)
+//       }
       if (this.checked) {
         fields.push(this.value)
       }

@@ -46,7 +46,8 @@ mark {
                 <option selected value=-1>Select...</option>
               </select>
             </div>
-          <ul class="list-group" id="fields"></ul>
+            <input type='text' id='mapping_filter' class='mapping_filter form-control form-control-sm' placeholder='Field`s filter'>
+            <div id="fields"></div>
           </nav>
         </div> <!-- /.left -->
         <main class="col-xl-10 py-md-4 pl-md-2 bd-content" role="main">
@@ -109,9 +110,12 @@ mark {
                 <div class="form-row">
                   <div class="form-group col-md-9">
                     <label for="add_filter_fieldlist">Field</label>
-                    <select id="add_filter_fieldlist" class="form-control">
+                    <input id="add_filter_fieldlist" list="adl_filter_fieldlist" class="form-control">
+                    <datalist id="adl_filter_fieldlist">
+                    </datalist>
+                    <!--select id="add_filter_fieldlist" class="form-control">
                       <option selected>Select</option>
-                    </select>
+                    </select-->
                   </div>
                   <div class="form-group col-md-3">
                     <label for="add_filter_operation">Value</label>
@@ -135,7 +139,6 @@ mark {
 
       </div><!-- /.modal -->
 
-
       <div class="modal fade" tabindex="-1" id="modal_update_filter" role="dialog">
         <div class="modal-dialog">
           <div class="modal-content">
@@ -151,9 +154,9 @@ mark {
                 <div class="form-row">
                   <div class="form-group col-md-9">
                     <label for="update_filter_fieldlist">Field</label>
-                    <select id="update_filter_fieldlist" class="form-control">
-                      <option selected>Select</option>
-                    </select>
+                    <input id="update_filter_fieldlist" list="udl_filter_fieldlist" class="form-control">
+                    <datalist id="udl_filter_fieldlist">
+                    </datalist>
                   </div>
                   <div class="form-group col-md-3">
                     <label for="update_filter_operation">Value</label>
@@ -185,5 +188,6 @@ mark {
 <script src="/assets/js/jquery.datetimepicker.full.min.js"></script>
 
 <script src="/assets/js/app-search.js"></script>
+
 
 </html>
