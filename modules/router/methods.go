@@ -217,15 +217,21 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 
 }
 
-func (rt *Router) getIndexGroups() ([]indexGroup, error) {
+func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 	var igs, igresp []indexGroup
-
+	var host string
 	re := regexp.MustCompile(`^([\w\d\-_]+)-(\d{4}\.\d{2}\.\d{2}(-\d{2})*)`)
 
 	//	rt.nodes.RLock()
 	//	defer rt.nodes.RUnlock()
 	t := time.Now()
-	response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/indices/*-"+t.Format("2006.01.02")+"*,-.*/?format=json&h=index", "Search")
+	if cluster == "Snapshot" {
+		host = rt.conf.Snapshot.Host
+	} else if cluster == "Search" {
+		host = rt.conf.Search.Host
+	}
+
+	response, err := rt.doGet(host+"_cat/indices/*-"+t.Format("2006.01.02")+"*,-.*/?format=json&h=index", cluster)
 	if err != nil {
 		return nil, err
 	}

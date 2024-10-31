@@ -42,8 +42,8 @@ $(document).ready(function(){
         var str = "";
         for(var k in data) {
           name = data[k].Name;
-          host = data[k].Host;
-          $('#clusters').append(new Option(name, host,false,false));
+          ctype = data[k].Type;
+          $('#clusters').append(new Option(name, ctype,false,false));
         }
     }
   });

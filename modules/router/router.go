@@ -133,6 +133,7 @@ type indexGroup struct {
 type Cluster struct {
 	Name string
 	Host string
+	Type string
 }
 
 type snapList []struct {
@@ -558,9 +559,17 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 		}
 		/*  ---- search --- */
+	case "get_clusters":
+		{
+			var cl []Cluster
+			cl = append(cl, Cluster{rt.conf.Snapshot.Name, rt.conf.Snapshot.Host, "Snapshot"})
+			cl = append(cl, Cluster{rt.conf.Search.Name, rt.conf.Search.Host, "Search"})
+			j, _ := json.Marshal(cl)
+			w.Write(j)
+		}
 	case "get_index_groups":
 		{
-			response, err := rt.getIndexGroups()
+			response, err := rt.getIndexGroups(request.Search.Cluster)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -576,10 +585,15 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			var (
 				fullm map[string]interface{}
 				m     map[string]interface{}
+				host  string
 			)
-
+			if request.Search.Cluster == "Snapshot" {
+				host = rt.conf.Snapshot.Host
+			} else if request.Search.Cluster == "Search" {
+				host = rt.conf.Search.Host
+			}
 			flatMap := make(map[string]string)
-			response, err := rt.doGet(request.Search.Cluster+request.Search.Index+t.Format("2006.01.02")+"/_mapping", "Search")
+			response, err := rt.doGet(host+request.Search.Index+t.Format("2006.01.02")+"/_mapping", "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -605,15 +619,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			w.Write(j)
 		}
 
-	case "get_clusters":
-		{
-			var cl []Cluster
-			cl = append(cl, Cluster{rt.conf.Snapshot.Name, rt.conf.Snapshot.Host})
-			cl = append(cl, Cluster{rt.conf.Search.Name, rt.conf.Search.Host})
-			j, _ := json.Marshal(cl)
-			w.Write(j)
-		}
-
 	case "search":
 		{
 			var (
@@ -628,7 +633,13 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				tf         string
 				fields     string
 				req        map[string]interface{}
+				host       string
 			)
+			if request.Search.Cluster == "Snapshot" {
+				host = rt.conf.Snapshot.Host
+			} else if request.Search.Cluster == "Search" {
+				host = rt.conf.Search.Host
+			}
 
 			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
 			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
@@ -676,7 +687,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			if request.Search.Count {
 				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
-				cresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_count", req, "Search")
+				cresponse, err := rt.doPost(host+request.Search.Index+"/_count", req, "Search")
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -685,7 +696,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				w.Write(cresponse)
 			} else {
 				_ = json.Unmarshal([]byte(full_query), &req)
-				sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search", req, "Search")
+				sresponse, err := rt.doPost(host+request.Search.Index+"/_search", req, "Search")
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -713,7 +724,14 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				req            map[string]interface{}
 				scrollresponse scrollResponse
 				fields_list    []string
+				host           string
 			)
+
+			if request.Search.Cluster == "Snapshot" {
+				host = rt.conf.Snapshot.Host
+			} else if request.Search.Cluster == "Search" {
+				host = rt.conf.Search.Host
+			}
 
 			ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
 			de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
@@ -767,7 +785,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-			sresponse, err := rt.doPost(request.Search.Cluster+request.Search.Index+"/_search?scroll=10m", req, "Search")
+			sresponse, err := rt.doPost(host+request.Search.Index+"/_search?scroll=10m", req, "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -843,7 +861,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			if scrollresponse.ScrollID != "" {
 				scroll := map[string]interface{}{"scroll": "10m", "scroll_id": scrollresponse.ScrollID}
 				for i := 0; i < rt.conf.Search.FileLimit.Rows/10000; i++ {
-					sresponse, err := rt.doPost(request.Search.Cluster+"_search/scroll", scroll, "Search")
+					sresponse, err := rt.doPost(host+"_search/scroll", scroll, "Search")
 					if err != nil {
 						log.Println("Failed to get scroll batch: ", err)
 						return
