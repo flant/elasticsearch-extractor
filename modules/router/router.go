@@ -778,6 +778,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
 			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
+			fmt.Println(full_query)
 
 			err = json.Unmarshal([]byte(full_query), &req)
 			if err != nil {
@@ -843,7 +844,16 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							case reflect.Slice:
 								{
 									s := reflect.ValueOf(data)
-									f.WriteString(fmt.Sprintf("%v;", s.Index(0)))
+									var ss string
+									for i := 0; i < s.Len(); i++ {
+										ss = ss + fmt.Sprintf(" %v,", s.Index(i))
+									}
+									f.WriteString(fmt.Sprintf("%s;", ss))
+
+								}
+							case reflect.String:
+								{
+									f.WriteString(fmt.Sprintf("%v;", strings.Replace(data.(string), "\n", "", -1)))
 								}
 							default:
 								{
@@ -903,14 +913,22 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 									case reflect.Slice:
 										{
 											s := reflect.ValueOf(data)
-											f.WriteString(fmt.Sprintf("%v;", s.Index(0)))
+											var ss string
+											for i := 0; i < s.Len(); i++ {
+												ss = ss + fmt.Sprintf(" %v,", s.Index(i))
+											}
+											f.WriteString(fmt.Sprintf("%s;", ss))
+
+										}
+									case reflect.String:
+										{
+											f.WriteString(fmt.Sprintf("%v;", strings.Replace(data.(string), "\n", "", -1)))
 										}
 									default:
 										{
 											f.WriteString(fmt.Sprintf("%v;", data))
 										}
 									}
-
 								}
 							}
 							f.WriteString("\n")
