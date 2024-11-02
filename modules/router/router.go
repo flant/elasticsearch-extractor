@@ -848,12 +848,14 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 									for i := 0; i < s.Len(); i++ {
 										ss = ss + fmt.Sprintf(" %v,", s.Index(i))
 									}
-									f.WriteString(fmt.Sprintf("%s;", ss))
+									ss = strings.Replace(ss, "\n", "", -1)
+									ss = strings.Replace(ss, "\"", "\"\"", -1)
+									f.WriteString(fmt.Sprintf(`"%s";`, ss))
 
 								}
 							case reflect.String:
 								{
-									f.WriteString(fmt.Sprintf("%v;", strings.Replace(data.(string), "\n", "", -1)))
+									f.WriteString(fmt.Sprintf(`"%v";`, strings.Replace(strings.Replace(data.(string), "\n", "", -1), "\"", "\"\"", -1)))
 								}
 							default:
 								{
@@ -917,12 +919,13 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 											for i := 0; i < s.Len(); i++ {
 												ss = ss + fmt.Sprintf(" %v,", s.Index(i))
 											}
-											f.WriteString(fmt.Sprintf("%s;", ss))
-
+											ss = strings.Replace(ss, "\n", "", -1)
+											ss = strings.Replace(ss, "\"", "\"\"", -1)
+											f.WriteString(fmt.Sprintf(`"%s";`, ss))
 										}
 									case reflect.String:
 										{
-											f.WriteString(fmt.Sprintf("%v;", strings.Replace(data.(string), "\n", "", -1)))
+											f.WriteString(fmt.Sprintf(`"%v";`, strings.Replace(strings.Replace(data.(string), "\n", "", -1), "\"", "\"\"", -1)))
 										}
 									default:
 										{
