@@ -837,6 +837,8 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							data = row.Fields[fm]
 						}
 
+						fmt.Printf("%v\n", data)
+
 						if data == nil {
 							f.WriteString(fmt.Sprintf("%s;", "--"))
 						} else {
