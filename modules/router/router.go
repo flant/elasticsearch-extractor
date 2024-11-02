@@ -845,9 +845,9 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 									s := reflect.ValueOf(data)
 									var ss string
 									for i := 0; i < s.Len(); i++ {
-										ss = ss + fmt.Sprintf("%v,", s.Index(i))
+										ss = ss + fmt.Sprintf("%v, ", s.Index(i))
 									}
-									ss = strings.TrimSuffix(ss, ",")
+									ss = strings.TrimSuffix(ss, ", ")
 									ss = strings.Replace(ss, "\n", "", -1)
 									ss = strings.Replace(ss, "\"", "\"\"", -1)
 									f.WriteString(fmt.Sprintf(`"%s";`, ss))
@@ -917,8 +917,9 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 											s := reflect.ValueOf(data)
 											var ss string
 											for i := 0; i < s.Len(); i++ {
-												ss = ss + fmt.Sprintf(" %v,", s.Index(i))
+												ss = ss + fmt.Sprintf("%v, ", s.Index(i))
 											}
+											ss = strings.TrimSuffix(ss, ", ")
 											ss = strings.Replace(ss, "\n", "", -1)
 											ss = strings.Replace(ss, "\"", "\"\"", -1)
 											f.WriteString(fmt.Sprintf(`"%s";`, ss))
