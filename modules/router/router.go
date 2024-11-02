@@ -815,7 +815,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			if len(scrollresponse.HitsRoot.Hits) > 0 {
 				var data any
 				for _, row := range scrollresponse.HitsRoot.Hits {
-
 					fileInfo, err := os.Stat("/tmp/data/" + request.Search.Fname + ".csv")
 					if err != nil {
 						log.Println(err)
@@ -837,8 +836,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 							data = row.Fields[fm]
 						}
 
-						fmt.Printf("%v\n", data)
-
 						if data == nil {
 							f.WriteString(fmt.Sprintf("%s;", "--"))
 						} else {
@@ -848,8 +845,9 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 									s := reflect.ValueOf(data)
 									var ss string
 									for i := 0; i < s.Len(); i++ {
-										ss = ss + fmt.Sprintf(" %v,", s.Index(i))
+										ss = ss + fmt.Sprintf("%v,", s.Index(i))
 									}
+									ss = strings.TrimSuffix(ss, ",")
 									ss = strings.Replace(ss, "\n", "", -1)
 									ss = strings.Replace(ss, "\"", "\"\"", -1)
 									f.WriteString(fmt.Sprintf(`"%s";`, ss))

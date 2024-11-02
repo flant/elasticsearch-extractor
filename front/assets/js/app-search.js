@@ -405,7 +405,9 @@ $("#xtract_csv").click(function(){
         fields.push(this.value)
       }
     });
-
+    if ( fields.length == 0 ) {
+      fields = mapping;
+    }
     var post = {
       "action": "prepare_csv",
       "search" : {
