@@ -778,7 +778,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
 			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
-			fmt.Println(full_query)
+			//fmt.Println(full_query)
 
 			err = json.Unmarshal([]byte(full_query), &req)
 			if err != nil {
