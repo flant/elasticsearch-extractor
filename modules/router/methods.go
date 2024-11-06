@@ -220,7 +220,7 @@ func (rt *Router) getNodes() ([]singleNode, error) {
 func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 	var igs, igresp []indexGroup
 	var host string
-	re := regexp.MustCompile(`^([\w\d\-_]+)-(\d{4}\.\d{2}\.\d{2}(-\d{2})*)`)
+	re := regexp.MustCompile(`^([\w\d\-_\.]+)-(\d{4}\.\d{2}\.\d{2}(-\d{2})*)`)
 
 	//	rt.nodes.RLock()
 	//	defer rt.nodes.RUnlock()
