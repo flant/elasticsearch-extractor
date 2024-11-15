@@ -236,6 +236,7 @@ func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 		return nil, err
 	}
 	err = json.Unmarshal(response, &igs)
+	fmt.Printf("%v\n", igs)
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +245,9 @@ func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 		n.Index = match[1] + "-*"
 		igresp = append(igresp, n)
 	}
-
-	return igresp, nil
+	unique := removeDuplicates(igresp)
+	fmt.Printf("%v\n", unique)
+	return unique, nil
 
 }
 
@@ -318,4 +320,19 @@ func allocateSpaceForFile(path string, size int64) {
 	if err := f.Truncate(size); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func removeDuplicates(slice []indexGroup) []indexGroup {
+	// Create a map to store unique elements
+	seen := make(map[indexGroup]bool)
+	var result []indexGroup
+
+	// Loop through the slice, adding elements to the map if they haven't been seen before
+	for _, val := range slice {
+		if _, ok := seen[val]; !ok {
+			seen[val] = true
+			result = append(result, val)
+		}
+	}
+	return result
 }

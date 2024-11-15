@@ -653,7 +653,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			for _, f := range request.Search.Filters {
 
 				if f.Operation == "is" {
-					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+					filters += `{ "wildcard": {"` + f.Field + `": {"value": "` + f.Value + `" } } },`
 				} else if f.Operation == "exists" {
 					filters += `{ "exists": {"field":"` + f.Field + `" } },`
 				} else if f.Operation == "is_not" {
@@ -684,7 +684,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
 			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
-
+			fmt.Println(full_query)
 			if request.Search.Count {
 				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
 				cresponse, err := rt.doPost(host+request.Search.Index+"/_count", req, "Search")
@@ -747,7 +747,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			for _, f := range request.Search.Filters {
 
 				if f.Operation == "is" {
-					filters += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+					filters += `{ "wildcard": {"` + f.Field + `": {"value": "` + f.Value + `" } } },`
 				} else if f.Operation == "exists" {
 					filters += `{ "exists": {"field":"` + f.Field + `" } },`
 				} else if f.Operation == "is_not" {
@@ -778,7 +778,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
 			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
-			//fmt.Println(full_query)
 
 			err = json.Unmarshal([]byte(full_query), &req)
 			if err != nil {

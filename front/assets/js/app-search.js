@@ -1,16 +1,18 @@
-const date = new Date();
+const dateS = new Date();
+const dateE = new Date();
 var mapping = [];
 var fmapping = {};
 var filter_operation = ["is", "is_not", "exists", "does_not_exists"]
 var filters_set = {}
-date.setMinutes(date.getMinutes() - 15)
+dateS.setMinutes(dateS.getMinutes() - 195)
+dateE.setMinutes(dateE.getMinutes() - 180)
 $.datetimepicker.setLocale('ru');
-$('#datetimepicker_start').datetimepicker({timepicker: true, format:'Y-m-d H:i:s', step: 15, value:date});
+$('#datetimepicker_start').datetimepicker({timepicker: true, format:'Y-m-d H:i:s', step: 15, value:dateS});
 $('#datetimepicker_end').datetimepicker({
   timepicker: true, 
   format:'Y-m-d H:i:s', 
   step: 15,
-  value:new Date(),
+  value:dateE,
   onShow:function( ct ){
    this.setOptions({
     minDate:$('#datetimepicker_start').val()?$('#datetimepicker_start').val():false
