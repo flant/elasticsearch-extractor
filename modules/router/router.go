@@ -653,7 +653,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			for _, f := range request.Search.Filters {
 
 				if f.Operation == "is" {
-					filters += `{ "wildcard": {"` + f.Field + `": {"value": "` + f.Value + `" } } },`
+					filters += `{ "wildcard": {"` + f.Field + `.keyword": {"value": "` + f.Value + `" } } },`
 				} else if f.Operation == "exists" {
 					filters += `{ "exists": {"field":"` + f.Field + `" } },`
 				} else if f.Operation == "is_not" {
@@ -747,7 +747,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			for _, f := range request.Search.Filters {
 
 				if f.Operation == "is" {
-					filters += `{ "wildcard": {"` + f.Field + `": {"value": "` + f.Value + `" } } },`
+					filters += `{ "wildcard": {"` + f.Field + `.keyword": {"value": "` + f.Value + `" } } },`
 				} else if f.Operation == "exists" {
 					filters += `{ "exists": {"field":"` + f.Field + `" } },`
 				} else if f.Operation == "is_not" {
