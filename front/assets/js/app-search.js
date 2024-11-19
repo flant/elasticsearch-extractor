@@ -4,15 +4,17 @@ var mapping = [];
 var fmapping = {};
 var filter_operation = ["is", "is_not", "exists", "does_not_exists"]
 var filters_set = {}
-dateS.setMinutes(dateS.getMinutes() - 195)
-dateE.setMinutes(dateE.getMinutes() - 180)
+//dateS.setMinutes(dateS.getMinutes() - 195)
+dateS.setMinutes(dateS.getMinutes() - 15)
+//dateE.setMinutes(dateE.getMinutes() - 180)
+//dateE.setMinutes(dateE.getMinutes() - 180)
 $.datetimepicker.setLocale('ru');
-$('#datetimepicker_start').datetimepicker({timepicker: true, format:'Y-m-d H:i:s', step: 15, value:dateS});
+$('#datetimepicker_start').datetimepicker({timepicker: true, format:'Y-m-d H:i:s', step: 15, value:dateS.toISOString()});
 $('#datetimepicker_end').datetimepicker({
   timepicker: true, 
   format:'Y-m-d H:i:s', 
   step: 15,
-  value:dateE,
+  value:dateE.toISOString(),
   onShow:function( ct ){
    this.setOptions({
     minDate:$('#datetimepicker_start').val()?$('#datetimepicker_start').val():false
@@ -21,6 +23,22 @@ $('#datetimepicker_end').datetimepicker({
 });
 //var getnodes = setInterval(NodeStatus, 5000);
 //var getindices = setInterval(IndexList, 3000);
+
+
+function cyrb53(str, seed = 0){
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for(let i = 0, ch; i < str.length; i++) {
+    ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+  h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+  h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
 
 function bytesToSize(bytes) {
    var sizes = ['b', 'kb', 'mb', 'gb', 'tb'];
@@ -103,29 +121,25 @@ $('#igs').on('change', function(e) {
           $('#mapping_filter').val('');
           str += "<ul class='list-group'>"
           for (var k in data) {
-//             <li class="list-group-item" style="">
-//             <input type="checkbox" name="fields" id="mappingkubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled" data-type="text" value="kubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled" >
-//             &nbsp;<label for="mappingkubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled" style="word-wrap: break-word !important;word-break: break-word;">kubernetes.namespace_labels.extended-monitoring_deckhouse_io/enabled&nbsp;&nbsp;(text)</label>
-//             </li>
-            str += "<li class='list-group-item' style='word-wrap: break-word !important; word-break: break-word;display: flex;align-items: flex-start;'><input type='checkbox' name='fields' id='mapping_"+k+"' data-type='" + data[k] + "' value='" + k + "' style='margin-top: 6px;'>&nbsp;<label for='mapping_"+k+"'>"+ k + "&nbsp;&nbsp;(" + data[k] + ")" +"</label></li>";
+            str += "<li class='list-group-item' style='word-wrap: break-word !important; word-break: break-word;display: flex;align-items: flex-start;' id='m_"+cyrb53(k)+"'><input type='checkbox' name='fields' id='mapping_"+k+"' data-type='" + data[k] + "' value='" + k + "' style='margin-top: 6px;'>&nbsp;<label for='mapping_"+k+"'>"+ k + "&nbsp;&nbsp;(" + data[k] + ")" +"</label></li>";
             mapping.push(k);
           }
           fmapping = data;
           str += "</ul>"
           $("#fields").html(str);
+          event.preventDefault();
       }
     });
 });
 
 $('#mapping_filter').on('keypress', function(e) {
-  var str="";
-  str += "<ul class='list-group'>"
   for (var k in fmapping) {
-    if (k.includes(e.target.value))
-      str += "<li class='list-group-item' style='word-wrap: break-word !important; word-break: break-word;display: flex;align-items: flex-start;'><input type='checkbox' name='fields' id='mapping_"+k+"' data-type='" + fmapping[k] + "' value='" + k + "' style='margin-top: 6px;'>&nbsp;<label for='mapping_"+k+"'>"+ k + "</label></li>";
+    if (k.includes(e.target.value)) {
+      $('#m_'+cyrb53(k)).show();
+    } else {
+      $('#m_'+cyrb53(k)).hide();
+    }
   }
-  str += "</ul>"
-  $("#fields").html(str);
 });
 
 $('#modal_add_filter').on('shown.bs.modal',function(e){

@@ -684,8 +684,8 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
 			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
-			fmt.Println(full_query)
 			if request.Search.Count {
+				log.Println("action: Count", "\tquery: ", "{"+query+"}")
 				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
 				cresponse, err := rt.doPost(host+request.Search.Index+"/_count", req, "Search")
 				if err != nil {
@@ -695,6 +695,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				}
 				w.Write(cresponse)
 			} else {
+				log.Println("action: Search", "\tquery: ", full_query)
 				_ = json.Unmarshal([]byte(full_query), &req)
 				sresponse, err := rt.doPost(host+request.Search.Index+"/_search", req, "Search")
 				if err != nil {

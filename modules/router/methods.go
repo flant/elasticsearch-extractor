@@ -236,7 +236,6 @@ func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 		return nil, err
 	}
 	err = json.Unmarshal(response, &igs)
-	fmt.Printf("%v\n", igs)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +245,6 @@ func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 		igresp = append(igresp, n)
 	}
 	unique := removeDuplicates(igresp)
-	fmt.Printf("%v\n", unique)
 	return unique, nil
 
 }
