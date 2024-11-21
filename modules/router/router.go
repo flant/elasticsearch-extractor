@@ -223,7 +223,6 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", r.UserAgent())
 	/* отправить его клиенту */
 	contentType := mime.TypeByExtension(path.Ext(cFile))
 	w.Header().Set("Content-Type", contentType)
@@ -256,16 +255,15 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusMethodNotAllowed, "\t", "Invalid request method ")
+		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusMethodNotAllowed, "\t", "Invalid request method ")
 		return
 	}
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", http.StatusInternalServerError, "\t", err.Error())
+		log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 		return
 	}
-
 	switch request.Action {
 	case "get_repositories":
 		{
@@ -275,6 +273,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(response)
 		}
 	case "get_nodes":
@@ -287,6 +286,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			j, _ := json.Marshal(nresp)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(j)
 		}
 
@@ -298,7 +298,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(response)
 		}
 
@@ -316,7 +316,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
-
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(response)
 		}
 
@@ -388,7 +388,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			rt.sl = snap_list
 			j, _ := json.Marshal(snap_list)
-
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(j)
 		}
 
@@ -421,10 +421,8 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			}
 
-			log.Println("Get Snapshots from cache")
-
 			j, _ := json.Marshal(rt.sl)
-
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", "Get Snapshots from cache")
 			w.Write(j)
 		}
 
@@ -451,6 +449,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(status_response)
 		}
 
@@ -555,6 +554,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write([]byte(msg))
 
 		}
@@ -565,6 +565,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			cl = append(cl, Cluster{rt.conf.Snapshot.Name, rt.conf.Snapshot.Host, "Snapshot"})
 			cl = append(cl, Cluster{rt.conf.Search.Name, rt.conf.Search.Host, "Search"})
 			j, _ := json.Marshal(cl)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(j)
 		}
 	case "get_index_groups":
@@ -576,6 +577,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			j, _ := json.Marshal(response)
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(j)
 		}
 
@@ -593,7 +595,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				host = rt.conf.Search.Host
 			}
 			flatMap := make(map[string]string)
-			response, err := rt.doGet(host+request.Search.Index+t.Format("2006.01.02")+"/_mapping", "Search")
+			response, err := rt.doGet(host+request.Search.Index+t.Format("2006.01.02")+"*/_mapping", "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -615,7 +617,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			j, _ := json.Marshal(flatMap)
-
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", host+request.Search.Index)
 			w.Write(j)
 		}
 
@@ -685,7 +687,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			full_query = fmt.Sprintf(`{"size": 500, %s, %s, %s, %s }`, sort, use_source, fields, query)
 			if request.Search.Count {
-				log.Println("action: Count", "\tquery: ", "{"+query+"}")
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", host+request.Search.Index, "\t", "action: Count", "\tquery: ", "{"+query+"}")
 				_ = json.Unmarshal([]byte("{"+query+"}"), &req)
 				cresponse, err := rt.doPost(host+request.Search.Index+"/_count", req, "Search")
 				if err != nil {
@@ -693,9 +695,10 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 					log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 					return
 				}
+
 				w.Write(cresponse)
 			} else {
-				log.Println("action: Search", "\tquery: ", full_query)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", host+request.Search.Index, "\t", "action: Search", "\tquery: ", full_query)
 				_ = json.Unmarshal([]byte(full_query), &req)
 				sresponse, err := rt.doPost(host+request.Search.Index+"/_search", req, "Search")
 				if err != nil {
@@ -941,6 +944,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				}
 
 			}
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", host+request.Search.Index, "\t", "action: CSV", "\tquery: ", full_query, "\tfile: ", request.Search.Fname)
 			w.Write([]byte("Done"))
 
 		}
