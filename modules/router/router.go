@@ -455,7 +455,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "restore":
 		{
-
 			if request.Values.Repo == "" {
 				msg := `{"error":"Required parameter Values.Repo is missed"}`
 				http.Error(w, msg, http.StatusBadRequest)

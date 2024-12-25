@@ -131,8 +131,8 @@ body {
 
 var kibana_url = "{{.}}"
 
-//var getnodes = setInterval(NodeStatus, 5000);
-//var getindices = setInterval(IndexList, 3000);
+var getnodes = setInterval(NodeStatus, 5000);
+var getindices = setInterval(IndexList, 3000);
 
 function bytesToSize(bytes) {
    var sizes = ['b', 'kb', 'mb', 'gb', 'tb'];
