@@ -630,7 +630,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				host = rt.conf.Search.Host
 			}
 			flatMap := make(map[string]string)
-			response, err := rt.doGet(host+request.Search.Index+t.Format("2006.01.02")+"*/_mapping", "Search")
+			response, err := rt.doGet(host+request.Search.Index+"*"+t.Format("2006.01.02")+"*,"+request.Search.Index+"*"+t.Format("02-01-2006")+"*/_mapping", "Search")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
