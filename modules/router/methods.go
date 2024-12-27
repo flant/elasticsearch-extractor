@@ -231,7 +231,7 @@ func (rt *Router) getIndexGroups(cluster string) ([]indexGroup, error) {
 		host = rt.conf.Search.Host
 	}
 
-	response, err := rt.doGet(host+"_cat/indices/*-"+t.Format("2006.01.02")+"*,-.*/?format=json&h=index", cluster)
+	response, err := rt.doGet(host+"_cat/indices/*-"+t.Format("2006.01.02")+"*,*-"+t.Format("02-01-2006")+",-.*/?format=json&h=index", cluster)
 	if err != nil {
 		return nil, err
 	}

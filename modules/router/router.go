@@ -507,6 +507,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			// Если в кластере есть недовосстановленные индексы - прерываем
 			if ch_status.InitializingShards > 5 || ch_status.UnassignedShards > 5 {
 				msg := `{"message":"Indices will not be restored at now. Please wait", "error":1}`
 				http.Error(w, msg, http.StatusTooManyRequests)
@@ -554,6 +555,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				w.Write([]byte(msg))
 			}
 
+			/*  Не создаем паттерны для восстановленных индексов
 			for _, iname := range index_list_for_restore {
 				if strings.Contains(iname, "v3") {
 					ip_req := map[string]interface{}{
@@ -584,6 +586,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 				}
 			}
+			*/
 
 			msg := fmt.Sprintf(`{"message":"Indices '%v' will be restored", "error":0}`, index_list_for_restore)
 			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
