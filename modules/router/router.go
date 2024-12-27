@@ -160,6 +160,13 @@ type Hit struct {
 
 type IndicesInSnap map[string]*IndexInSnap
 
+type ClusterHealth struct {
+	ClusterName        string `json:"cluster_name,omitempty"`
+	Status             string `json:"status,omitempty"`
+	InitializingShards int    `json:"initializingShards,omitempty"`
+	UnassignedShards   int    `json:"unassigned_shards,omitempty"`
+}
+
 func Run(cnf config.Config) {
 	rt := Router{}
 	rt.conf = cnf
@@ -483,6 +490,31 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			ch_response, err := rt.doGet(rt.conf.Snapshot.Host+"_cluster/health/extracted*", "Snapshot")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t_cluster/health/extracted*\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t_cluster/health/extracted*\t", r.UserAgent())
+
+			var ch_status ClusterHealth
+			err = json.Unmarshal(ch_response, &ch_status)
+
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t_cluster/health/extracted*\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
+
+			if ch_status.InitializingShards > 5 || ch_status.UnassignedShards > 5 {
+				msg := `{"message":"Indices will not be restored at now. Please wait", "error":1}`
+				http.Error(w, msg, http.StatusTooManyRequests)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusTooManyRequests, "\t", msg)
+				w.Write([]byte(msg))
+				return
+			}
+
 			indices := make(IndicesInSnap)
 
 			for _, iname := range request.Values.Indices {
@@ -497,6 +529,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			index_list_for_restore, index_list_not_restore := rt.Barrel(indices, rt.conf.Snapshot.IsS3)
+
 			t := time.Now()
 			req := map[string]interface{}{
 				"ignore_unavailable":   false,
