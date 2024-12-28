@@ -512,7 +512,6 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				msg := `{"message":"Indices will not be restored at now. Please wait", "error":1}`
 				http.Error(w, msg, http.StatusTooManyRequests)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusTooManyRequests, "\t", msg)
-				w.Write([]byte(msg))
 				return
 			}
 
