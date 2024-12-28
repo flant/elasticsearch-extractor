@@ -509,7 +509,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 			// Если в кластере есть недовосстановленные индексы - прерываем
 			if ch_status.InitializingShards > 5 || ch_status.UnassignedShards > 5 {
-				msg := `{"message":"Indices will not be restored at now. Please wait", "error":1}`
+				msg := `{"error":"Indices will not be restored at now. Please wait"}`
 				http.Error(w, msg, http.StatusTooManyRequests)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusTooManyRequests, "\t", msg)
 				return
