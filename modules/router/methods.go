@@ -21,6 +21,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"bytes"
 	"net"
@@ -295,6 +296,165 @@ func (rt *Router) flattenMap(prefix string, nestedMap map[string]interface{}, fl
 			}
 		}
 	}
+}
+
+func (rt *Router) saveHintsToJsonFile(request apiRequest) error {
+	var (
+		use_source     string
+		query          string
+		filters        string
+		must_not       string
+		xql            string
+		full_query     string
+		timefield      string
+		sort           string
+		tf             string
+		fields         string
+		req            map[string]interface{}
+		scrollresponse scrollResponse
+		fields_list    []string
+		host           string
+		request_batch  int64
+	)
+
+	request_batch = rt.conf.Search.RequestBatch
+
+	if request.Search.Cluster == "Snapshot" {
+		host = rt.conf.Snapshot.Host
+	} else if request.Search.Cluster == "Search" {
+		host = rt.conf.Search.Host
+	}
+
+	ds, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateStart+" (MSK)")
+	de, _ := time.Parse("2006-01-02 15:04:05 (MST)", request.Search.DateEnd+" (MSK)")
+
+	if len(request.Search.Fields) == 0 {
+		use_source = `"_source": true`
+		fields_list = request.Search.Mapping
+	} else {
+		use_source = `"_source": false`
+		fields_list = request.Search.Fields
+	}
+
+	for _, f := range request.Search.Filters {
+		if f.Operation == "is" {
+			filters += `{ "wildcard": {"` + f.Field + `.keyword": {"value": "` + f.Value + `" } } },`
+		} else if f.Operation == "exists" {
+			filters += `{ "exists": {"field":"` + f.Field + `" } },`
+		} else if f.Operation == "is_not" {
+			must_not += `{ "match_phrase": {"` + f.Field + `":"` + f.Value + `" } },`
+		} else if f.Operation == "does_not_exists" {
+			must_not += `{ "exists": {"field":"` + f.Field + `" } },`
+		}
+	}
+	filters += `{"match_all": {}}`
+	must_not, _ = strings.CutSuffix(must_not, ",")
+
+	if request.Search.Xql != "" {
+		xql = `{ "simple_query_string": { "query": "` + request.Search.Xql + `" } }`
+	}
+
+	if len(request.Search.Timefields) > 0 {
+		timefield = request.Search.Timefields[0]
+		fields = `"fields": ["` + timefield + `", "` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+		sort = `"sort": [ {"` + timefield + `": "desc" } ]`
+		tf = `{ "range": { "` + timefield + `": {
+						   "gte": "` + ds.Format("2006-01-02T15:04:05.000Z") + `",
+						   "lte": "` + de.Format("2006-01-02T15:04:05.000Z") + `",
+						   "format": "strict_date_optional_time" } } },`
+	} else {
+		sort = ""
+		tf = ""
+		fields = `"fields": ["` + strings.Join(request.Search.Fields, "\", \"") + `" ]`
+	}
+	query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
+
+	full_query = fmt.Sprintf(`{"size": %d, %s, %s, %s, %s }`, request_batch, sort, use_source, fields, query)
+	fmt.Println("full_query", full_query)
+	err := json.Unmarshal([]byte(full_query), &req)
+	if err != nil {
+		return err
+	}
+
+	fileName := request.Search.Fname + ".json"
+	filePath := "/tmp/data/" + fileName
+	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	scrollId := ""
+	for {
+		sresponse := []byte{}
+		if scrollId == "" {
+			r, err := rt.doPost(host+request.Search.Index+"/_search?scroll=10m", req, "Search")
+			if err != nil {
+				return err
+			}
+			sresponse = r
+		} else {
+			scroll := map[string]interface{}{"scroll": "10m", "scroll_id": scrollId}
+			r, err := rt.doPost(host+"_search/scroll", scroll, "Search")
+			if err != nil {
+				return err
+			}
+			sresponse = r
+		}
+
+		err = json.Unmarshal(sresponse, &scrollresponse)
+		if err != nil {
+			return err
+		}
+
+		scrollId = scrollresponse.ScrollID
+
+		log.Println("Hints total", scrollresponse.HitsRoot.Total.Value)
+		log.Println("Hints req len", len(scrollresponse.HitsRoot.Hits))
+		log.Println("scrollId", scrollId)
+
+		if len(scrollresponse.HitsRoot.Hits) == 0 {
+			_, _ = rt.doDel(request.Search.Cluster+"_search/scroll/"+scrollresponse.ScrollID, "Search")
+			log.Println("Search is done!")
+			break
+		}
+
+		for _, hint := range scrollresponse.HitsRoot.Hits {
+			var row = make(JSONRow)
+			for _, field := range fields_list {
+				if len(request.Search.Fields) == 0 {
+					row[field] = hint.Source[field]
+				} else {
+					row[field] = hint.Fields[field]
+				}
+
+				if row[field] == nil {
+					row[field] = "--"
+				}
+			}
+
+			jsonData, err := json.Marshal(row)
+			if err != nil {
+				return err
+			}
+
+			_, err = f.WriteString(string(jsonData) + "\n")
+			if err != nil {
+				return err
+			}
+		}
+
+		fileInfo, err := os.Stat(filePath)
+		if err != nil {
+			return err
+		}
+		fmt.Println("fileInfo", fileInfo.Size())
+		if fileInfo.Size() > rt.conf.Search.FileLimit.Size {
+			return errors.New(fmt.Sprintf("file size %s is too big", filePath))
+		}
+	}
+
+	return nil
 }
 
 func getFile(fname string, size int64) ([]byte, error) {

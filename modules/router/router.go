@@ -148,9 +148,14 @@ type scrollResponse struct {
 	HitsRoot Hits   `json:"hits"`
 }
 
+type HitsTotal struct {
+	Value int64 `json:"value"`
+}
+
 type Hits struct {
-	Hits     []Hit   `json:"hits"`
-	MaxScore float64 `json:"max_score"`
+	Total    HitsTotal `json:"total"`
+	Hits     []Hit     `json:"hits"`
+	MaxScore float64   `json:"max_score"`
 }
 
 type Hit struct {
@@ -166,6 +171,8 @@ type ClusterHealth struct {
 	InitializingShards int    `json:"initializingShards,omitempty"`
 	UnassignedShards   int    `json:"unassigned_shards,omitempty"`
 }
+
+type JSONRow map[string]interface{}
 
 func Run(cnf config.Config) {
 	rt := Router{}
@@ -213,11 +220,17 @@ func (rt *Router) FrontHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", 404, "\t", err.Error(), "\t", r.UserAgent())
 			return
 		}
-		contentType := mime.TypeByExtension(path.Ext("/tmp" + file))
 
-		w.Header().Set("Content-Type", contentType)
+		contentType := mime.TypeByExtension(path.Ext("/tmp" + file))
+		if contentType == "application/json" {
+			w.Header().Set("Content-Type", "application/octet-stream")
+		} else {
+			w.Header().Set("Content-Type", contentType)
+		}
+
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("X-Server", version.Version)
+
 		w.Write(bytes)
 		return
 	}
@@ -763,7 +776,10 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				scrollresponse scrollResponse
 				fields_list    []string
 				host           string
+				request_batch  int64
 			)
+
+			request_batch = rt.conf.Search.RequestBatch
 
 			if request.Search.Cluster == "Snapshot" {
 				host = rt.conf.Snapshot.Host
@@ -815,7 +831,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			query = fmt.Sprintf(`"query": { "bool": { "must": [ %s ],"filter": [  %s  %s ], "should": [],"must_not": [ %s ] }}`, xql, tf, filters, must_not)
 
-			full_query = fmt.Sprintf(`{"size": 10000, %s, %s, %s, %s }`, sort, use_source, fields, query)
+			full_query = fmt.Sprintf(`{"size": %d, %s, %s, %s, %s }`, request_batch, sort, use_source, fields, query)
 
 			err = json.Unmarshal([]byte(full_query), &req)
 			if err != nil {
@@ -980,7 +996,19 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", host+request.Search.Index, "\t", "action: CSV", "\tquery: ", full_query, "\tfile: ", request.Search.Fname)
 			w.Write([]byte("Done"))
+		}
+	case "prepare_json":
+		{
+			err := rt.saveHintsToJsonFile(request)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+				return
+			}
 
+			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent(), "\t", "action: JSON")
+
+			w.Write([]byte("Done"))
 		}
 
 	default:

@@ -45,6 +45,7 @@ type Config struct {
 	Search struct {
 		Host               string `yaml:"host,omitempty"`
 		Name               string `yaml:"name,omitempty"`
+		RequestBatch       int64  `yaml:"request_batch,omitempty"`
 		SSL                bool   `yaml:"ssl,omitempty"`
 		Username           string `yaml:"username,omitempty"`
 		Password           string `yaml:"password,omitempty"`
