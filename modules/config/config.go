@@ -106,6 +106,10 @@ func Parse(f string) Config {
 		c.Search.Name = string(re.Expand([]byte{}, template, []byte(c.Search.Host), s1))
 	}
 
+	if c.Search.RequestBatch == 0 {
+		c.Search.RequestBatch = 10000
+	}
+
 	c.Search.FileLimit.Rows = 1000000
 	if c.Search.FileLimit.RowsRaw != nil {
 		c.Search.FileLimit.Rows = *c.Search.FileLimit.RowsRaw
