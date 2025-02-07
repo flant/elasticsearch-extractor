@@ -448,9 +448,9 @@ func (rt *Router) saveHintsToJsonFile(request apiRequest) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("fileInfo", fileInfo.Size())
+
 		if fileInfo.Size() > rt.conf.Search.FileLimit.Size {
-			return errors.New(fmt.Sprintf("file size %s is too big", filePath))
+			return errors.New(fmt.Sprintf("file %s with size %d is too big", filePath, fileInfo.Size()))
 		}
 	}
 
