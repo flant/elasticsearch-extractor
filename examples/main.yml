@@ -18,7 +18,7 @@ snapshot:
 search:
   host: https://localhost:9200/
   name: opensearch
-  request_batch: 10000
+#  request_batch: 10000
 # use this fields if elastic requires BA
   username: admin
   password: admin

@@ -421,6 +421,11 @@ func (rt *Router) saveHintsToJsonFile(request apiRequest) error {
 
 		for _, hint := range scrollresponse.HitsRoot.Hits {
 			var row = make(JSONRow)
+			if len(request.Search.Fields) == 0 {
+				row[request.Search.Timefields[0]] = hint.Source[request.Search.Timefields[0]]
+			} else {
+				row[request.Search.Timefields[0]] = hint.Fields[request.Search.Timefields[0]]
+			}
 			for _, field := range fields_list {
 				if len(request.Search.Fields) == 0 {
 					row[field] = hint.Source[field]
