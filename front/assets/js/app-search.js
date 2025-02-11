@@ -385,10 +385,10 @@ $("#search").click(function(){
             str+="</tr>";
           }
           str+="</tbody></table>";
-        $("#xtract_csv").prop('disabled', false);
+        $("#xtract_it").prop('disabled', false);
         } else {
           str = "<h3>No search results found</h3>";
-          $("#xtract_csv").prop('disabled', true);
+          $("#xtract_it").prop('disabled', true);
         }
         $("#result").html(str);
       },
@@ -400,12 +400,15 @@ $("#search").click(function(){
     //event.preventDefault();
 });
 
-$("#xtract_csv").click(function(){
+$( ".xtract_it" ).click(function(){
     $("#loading").removeClass('invisible');
     fname = (Math.random() + 1).toString(36).substring(4);
     fields = []
     tf = []
     xql = $('#xql').val()
+    format = $(this).hasClass('csv') ? 'csv' : 'json'
+    filePath = '/data/' + fname + "." + format
+    action = 'prepare_' + format
     indexOfLargestValue = 0
     for (var k in fmapping) {
       if (fmapping[k] =="date") {
@@ -425,7 +428,7 @@ $("#xtract_csv").click(function(){
       fields = mapping;
     }
     var post = {
-      "action": "prepare_csv",
+      "action": action,
       "search" : {
         "index": $('#igs').val(),
         "fields": fields,
@@ -449,8 +452,8 @@ $("#xtract_csv").click(function(){
       contentType: 'application/json',
       success: function (data) {},
       error: function (data) {
-        $("#download_link").html("<a href='/data/"+fname+".csv'>скачать</a>");
-        document.location.href = "/data/"+fname+".csv";
+        $("#download_link").html("<a href='" + filePath + "'>скачать</a>");
+        document.location.href = filePath;
       }
     })
     $("#loading").addClass('invisible');

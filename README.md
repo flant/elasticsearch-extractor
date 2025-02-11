@@ -35,6 +35,14 @@ $ sudo systemctl daemon-reload && systemctl start extractor
 $ sudo systemctl enable extractor
 ```
 
+## Hot reload
+Use `air`:
+```bash
+$ go install github.com/air-verse/air@latest
+$ air
+
+```
+
 ## Running in Docker
 
 ```

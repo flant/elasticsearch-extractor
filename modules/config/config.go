@@ -45,6 +45,7 @@ type Config struct {
 	Search struct {
 		Host               string `yaml:"host,omitempty"`
 		Name               string `yaml:"name,omitempty"`
+		RequestBatch       int64  `yaml:"request_batch,omitempty"`
 		SSL                bool   `yaml:"ssl,omitempty"`
 		Username           string `yaml:"username,omitempty"`
 		Password           string `yaml:"password,omitempty"`
@@ -103,6 +104,10 @@ func Parse(f string) Config {
 	if c.Search.Name == "" {
 		s1 := re.FindSubmatchIndex([]byte(c.Search.Host))
 		c.Search.Name = string(re.Expand([]byte{}, template, []byte(c.Search.Host), s1))
+	}
+
+	if c.Search.RequestBatch == 0 {
+		c.Search.RequestBatch = 10000
 	}
 
 	c.Search.FileLimit.Rows = 1000000

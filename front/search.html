@@ -69,7 +69,16 @@ mark {
                   <button type="button" class="btn btn-primary btn-sm" id="search">Search</button>
                 </div>
                 <div class="col">
-                  <button type="button" class="btn btn-success btn-sm" id="xtract_csv" disabled>Xtract it</button>
+                  <div class="btn-group" role="group">
+                    <button id="xtract_it" type="button" class="btn btn-success dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" disabled>
+                      Xtract it
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="xtract_it">
+                      <a class="dropdown-item xtract_it csv" href="#">CSV</a>
+                      <a class="dropdown-item xtract_it json" href="#">JSON</a>
+                    </div>
+                  </div>
+
                   <span id="download_link"></span>
                 </div>
               </div>
