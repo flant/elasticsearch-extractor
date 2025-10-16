@@ -137,10 +137,9 @@ type Cluster struct {
 }
 
 type snapList []struct {
-	Id          string `json:"id,omitempty"`
-	Status      string `json:"status,omitempty"`
-	End_epoch   string `json:"end_epoch,omitempty"`
-	Start_epoch string `json:"start_epoch,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Uuid  string `json:"uuid,omitempty"`
+	State string `json:"state,omitempty"`
 }
 
 type scrollResponse struct {
@@ -349,7 +348,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/snapshots/"+request.Values.Repo+"?format=json", "Snapshot")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/*?verbose=false&format=json", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -367,9 +366,9 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			if !rt.conf.Snapshot.Include {
 				j := 0
 				for _, n := range snap_list {
-					matched, err := regexp.MatchString(`^[\.]\S+`, n.Id)
+					matched, err := regexp.MatchString(`^[\.]\S+`, n.Name)
 					if err != nil {
-						log.Println("Regex error for ", n.Id)
+						log.Println("Regex error for ", n.Name)
 					}
 					if !matched {
 						snap_list[j] = n
@@ -380,7 +379,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				snap_list = snap_list[:j]
 
 			}
-			if request.Values.OrderType == "time" {
+			/*if request.Values.OrderType == "time" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(snap_list[:], func(i, j int) bool {
@@ -392,16 +391,17 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 					})
 				}
 
-			} else if request.Values.OrderType == "name" {
+			} else */
+			if request.Values.OrderType == "name" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(snap_list[:], func(i, j int) bool {
-						return snap_list[i].Id < snap_list[j].Id
+						return snap_list[i].Name < snap_list[j].Name
 					})
 
 				} else {
 					sort.Slice(snap_list[:], func(i, j int) bool {
-						return snap_list[i].Id > snap_list[j].Id
+						return snap_list[i].Name > snap_list[j].Name
 					})
 				}
 
@@ -414,7 +414,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "get_snapshots_sorted":
 		{
-			if request.Values.OrderType == "time" {
+			/*if request.Values.OrderType == "time" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
@@ -426,16 +426,17 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 					})
 				}
 
-			} else if request.Values.OrderType == "name" {
+			} else */
+			if request.Values.OrderType == "name" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
-						return rt.sl[i].Id < rt.sl[j].Id
+						return rt.sl[i].Name < rt.sl[j].Name
 					})
 
 				} else {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
-						return rt.sl[i].Id > rt.sl[j].Id
+						return rt.sl[i].Name > rt.sl[j].Name
 					})
 				}
 
