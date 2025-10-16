@@ -307,10 +307,10 @@ $('#repolist').on('click', 'a.repos', function(e) {
 
         for(var k in data) {
           snapshot = data[k].name;
-          #uniqid = data[k].start_epoch;
+          // uniqid = data[k].start_epoch;
           status = data[k].state;
-          #date = new Date(data[k].start_epoch * 1000);
-          #hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
+          // date = new Date(data[k].start_epoch * 1000);
+          // hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
           restore_button = "";
 
           if (status == "SUCCESS") {
@@ -365,11 +365,11 @@ $('#get_repo_sort_name').on('click', function(e) {
         dlicon = '<svg width="1em" height="1em" viewBox="0 0 16 16" class="bi bi-download" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path fill-rule="evenodd" d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg>';
 
         for(var k in data) {
-          snapshot = data[k].id;
-          uniqid = data[k].start_epoch;
-          status = data[k].status;
-          date = new Date(data[k].start_epoch * 1000);
-          hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
+          snapshot = data[k].name;
+          uniqid = data[k].uuid;
+          status = data[k].state;
+          // date = new Date(data[k].start_epoch * 1000);
+          // hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
           restore_button = "";
 
           if (status == "SUCCESS") {
@@ -380,7 +380,7 @@ $('#get_repo_sort_name').on('click', function(e) {
             restore_button = "";
           }
 
-          str += "<li><h5 class='font-weight-bold  list-group-item list-group-item-action' title='"+status+"'>"+icon+" <strong>" + snapshot + "</strong> created at " + hdate + restore_button +"</h5></li>";
+          str += "<li><h5 class='font-weight-bold  list-group-item list-group-item-action' title='"+status+"'>"+icon+" <strong>" + snapshot + "</strong> " + restore_button +"</h5></li>";
         }
 
         $("#loading").addClass('invisible');
