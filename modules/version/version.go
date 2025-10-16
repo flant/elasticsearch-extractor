@@ -13,4 +13,4 @@
 
 package version
 
-var Version = "extractor/v0.2.24"
+var Version = "extractor/v0.2.25"

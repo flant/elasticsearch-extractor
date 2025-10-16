@@ -4,4 +4,7 @@
 /modules/front/
 *~
 go.sum
-
+test.yml
+admin-crt.pem
+admin-key.pem
+admin-root-ca.pem
