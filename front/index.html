@@ -307,10 +307,10 @@ $('#repolist').on('click', 'a.repos', function(e) {
 
         for(var k in data) {
           snapshot = data[k].name;
-          uniqid = data[k].start_epoch;
+          #uniqid = data[k].start_epoch;
           status = data[k].state;
-          date = new Date(data[k].start_epoch * 1000);
-          hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
+          #date = new Date(data[k].start_epoch * 1000);
+          #hdate = date.toLocaleString("ru-RU", {timeZoneName: "short"});
           restore_button = "";
 
           if (status == "SUCCESS") {
@@ -321,7 +321,7 @@ $('#repolist').on('click', 'a.repos', function(e) {
             restore_button = "";
           }
 
-          str += "<li><h5 class='font-weight-bold  list-group-item list-group-item-action' title='"+status+"'>"+icon+" <strong>" + snapshot + "</strong> created at " + hdate + restore_button +"</h5></li>";
+          str += "<li><h5 class='font-weight-bold  list-group-item list-group-item-action' title='"+status+"'>"+icon+" <strong>" + snapshot + "</strong> " + restore_button +"</h5></li>";
         }
 
         $("#loading").addClass('invisible');
