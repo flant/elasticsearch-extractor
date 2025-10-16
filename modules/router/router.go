@@ -349,7 +349,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			response, err := rt.doGet(rt.conf.Snapshot.Host+"_cat/snapshots/"+request.Values.Repo+"?format=json", "Snapshot")
+			response, err := rt.doGet(rt.conf.Snapshot.Host+"_snapshot/"+request.Values.Repo+"/*?verbose=false&format=json", "Snapshot")
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
