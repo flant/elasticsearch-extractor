@@ -282,7 +282,7 @@ $('#repolist').on('click', 'a.repos', function(e) {
 
     $('#selectedsnap').html("from <strong>"+reponame+"</strong>");
 
-    #$("#get_repo_sort_time").attr("data-id", reponame);
+    //$("#get_repo_sort_time").attr("data-id", reponame);
     $("#get_repo_sort_name").attr("data-id", reponame);
     
     var post = {
@@ -331,7 +331,7 @@ $('#repolist').on('click', 'a.repos', function(e) {
 });
 
 
-$('#get_repo_sort_name, #get_repo_sort_time').on('click', function(e) {
+$('#get_repo_sort_name').on('click', function(e) {
 
     var reponame = e.target.dataset.id;
     var otype = e.target.dataset.otype;
