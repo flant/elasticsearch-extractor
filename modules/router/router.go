@@ -45,7 +45,7 @@ type Router struct {
 	conf  config.Config
 	nc    map[string]*http.Client
 	nodes nodesArray
-	sl    snapList
+	sl    []snapItem
 }
 
 type apiRequest struct {
@@ -136,10 +136,13 @@ type Cluster struct {
 	Type string
 }
 
-type snapList []struct {
-	Name  string `json:"name,omitempty"`
-	Uuid  string `json:"uuid,omitempty"`
-	State string `json:"state,omitempty"`
+type snapResponse struct {
+	Snapshots []snapItem `json:"snapshots"`
+}
+type snapItem struct {
+	Snapshot string `json:"snapshot,omitempty"`
+	Uuid     string `json:"uuid,omitempty"`
+	State    string `json:"state,omitempty"`
 }
 
 type scrollResponse struct {
@@ -355,8 +358,9 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			var snap_list snapList
-			err = json.Unmarshal(response, &snap_list)
+			var snap_resp snapResponse
+			var snap_items []snapItem
+			err = json.Unmarshal(response, &snap_resp)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
@@ -364,20 +368,16 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if !rt.conf.Snapshot.Include {
-				j := 0
-				for _, n := range snap_list {
-					matched, err := regexp.MatchString(`^[\.]\S+`, n.Name)
+				for _, n := range snap_resp.Snapshots {
+					matched, err := regexp.MatchString(`^[\.]\S+`, n.Snapshot)
 					if err != nil {
-						log.Println("Regex error for ", n.Name)
+						log.Println("Regex error for ", n.Snapshot)
 					}
 					if !matched {
-						snap_list[j] = n
-						j++
+						snap_items = append(snap_items, n)
 					}
 
 				}
-				snap_list = snap_list[:j]
-
 			}
 			/*if request.Values.OrderType == "time" {
 
@@ -395,19 +395,19 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			if request.Values.OrderType == "name" {
 
 				if request.Values.OrderDir == "asc" {
-					sort.Slice(snap_list[:], func(i, j int) bool {
-						return snap_list[i].Name < snap_list[j].Name
+					sort.Slice(snap_items[:], func(i, j int) bool {
+						return snap_items[i].Snapshot < snap_items[j].Snapshot
 					})
 
 				} else {
-					sort.Slice(snap_list[:], func(i, j int) bool {
-						return snap_list[i].Name > snap_list[j].Name
+					sort.Slice(snap_items[:], func(i, j int) bool {
+						return snap_items[i].Snapshot > snap_items[j].Snapshot
 					})
 				}
 
 			}
-			rt.sl = snap_list
-			j, _ := json.Marshal(snap_list)
+			rt.sl = snap_items
+			j, _ := json.Marshal(snap_items)
 			log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", r.UserAgent())
 			w.Write(j)
 		}
@@ -431,12 +431,12 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
-						return rt.sl[i].Name < rt.sl[j].Name
+						return rt.sl[i].Snapshot < rt.sl[j].Snapshot
 					})
 
 				} else {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
-						return rt.sl[i].Name > rt.sl[j].Name
+						return rt.sl[i].Snapshot > rt.sl[j].Snapshot
 					})
 				}
 
