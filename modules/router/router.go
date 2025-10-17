@@ -140,9 +140,11 @@ type snapResponse struct {
 	Snapshots []snapItem `json:"snapshots"`
 }
 type snapItem struct {
-	Snapshot string `json:"snapshot,omitempty"`
-	Uuid     string `json:"uuid,omitempty"`
-	State    string `json:"state,omitempty"`
+	Snapshot    string `json:"snapshot,omitempty"`
+	Uuid        string `json:"uuid,omitempty"`
+	State       string `json:"state,omitempty"`
+	CreateEpoch int64
+	CreateDate  string
 }
 
 type scrollResponse struct {
@@ -366,6 +368,7 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
 				return
 			}
+			re := regexp.MustCompile(`^(.*)-(\d{4}\.\d{2}\.\d{2})`)
 
 			if !rt.conf.Snapshot.Include {
 				for _, n := range snap_resp.Snapshots {
@@ -374,25 +377,46 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 						log.Println("Regex error for ", n.Snapshot)
 					}
 					if !matched {
+						match := re.FindStringSubmatch(n.Snapshot)
+						n.CreateDate = match[2]
+						d, err := time.Parse("2006.01.02", n.CreateDate)
+						n.CreateEpoch = d.Unix()
+						if err != nil {
+							http.Error(w, err.Error(), http.StatusInternalServerError)
+							log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+							return
+						}
 						snap_items = append(snap_items, n)
 					}
-
+				}
+			} else {
+				for _, n := range snap_resp.Snapshots {
+					match := re.FindStringSubmatch(n.Snapshot)
+					n.CreateDate = match[2]
+					d, err := time.Parse("2006.01.02", n.CreateDate)
+					n.CreateEpoch = d.Unix()
+					if err != nil {
+						http.Error(w, err.Error(), http.StatusInternalServerError)
+						log.Println(remoteIP, "\t", r.Method, "\t", r.URL.Path, "\t", request.Action, "\t", http.StatusInternalServerError, "\t", err.Error())
+						return
+					}
+					snap_items = append(snap_items, n)
 				}
 			}
-			/*if request.Values.OrderType == "time" {
+
+			if request.Values.OrderType == "time" {
 
 				if request.Values.OrderDir == "asc" {
-					sort.Slice(snap_list[:], func(i, j int) bool {
-						return snap_list[i].End_epoch < snap_list[j].End_epoch
+					sort.Slice(snap_items[:], func(i, j int) bool {
+						return snap_items[i].CreateEpoch < snap_items[j].CreateEpoch
 					})
 				} else {
-					sort.Slice(snap_list[:], func(i, j int) bool {
-						return snap_list[i].End_epoch > snap_list[j].End_epoch
+					sort.Slice(snap_items[:], func(i, j int) bool {
+						return snap_items[i].CreateEpoch > snap_items[j].CreateEpoch
 					})
 				}
 
-			} else */
-			if request.Values.OrderType == "name" {
+			} else if request.Values.OrderType == "name" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(snap_items[:], func(i, j int) bool {
@@ -414,20 +438,19 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 
 	case "get_snapshots_sorted":
 		{
-			/*if request.Values.OrderType == "time" {
+			if request.Values.OrderType == "time" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
-						return rt.sl[i].End_epoch < rt.sl[j].End_epoch
+						return rt.sl[i].CreateEpoch < rt.sl[j].CreateEpoch
 					})
 				} else {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
-						return rt.sl[i].End_epoch > rt.sl[j].End_epoch
+						return rt.sl[i].CreateEpoch > rt.sl[j].CreateEpoch
 					})
 				}
 
-			} else */
-			if request.Values.OrderType == "name" {
+			} else if request.Values.OrderType == "name" {
 
 				if request.Values.OrderDir == "asc" {
 					sort.Slice(rt.sl[:], func(i, j int) bool {
