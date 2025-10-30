@@ -378,6 +378,10 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 					}
 					if !matched {
 						match := re.FindStringSubmatch(n.Snapshot)
+                        if len(match) < 3 {
+                            log.Println("Skip snapshot with unexpected name:", n.Snapshot)
+                            continue
+                        }
 						n.CreateDate = match[2]
 						d, err := time.Parse("2006.01.02", n.CreateDate)
 						n.CreateEpoch = d.Unix()
@@ -392,6 +396,10 @@ func (rt *Router) ApiHandler(w http.ResponseWriter, r *http.Request) {
 			} else {
 				for _, n := range snap_resp.Snapshots {
 					match := re.FindStringSubmatch(n.Snapshot)
+					if len(match) < 3 {
+						log.Println("Skip snapshot with unexpected name:", n.Snapshot)
+						continue
+					}
 					n.CreateDate = match[2]
 					d, err := time.Parse("2006.01.02", n.CreateDate)
 					n.CreateEpoch = d.Unix()
