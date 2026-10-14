@@ -3,6 +3,10 @@ app:
   bind: 0.0.0.0
   timeout: 60
   kibana: http://kibana.host
+# необязательные: каталог файлов выгрузок, сколько их хранить, формат журнала (text|json)
+  data_dir: /tmp/data
+  export_ttl: 1h
+  log_format: json
 snapshot:
   host: https://localhost:9200/
   name: recoverer

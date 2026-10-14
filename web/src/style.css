@@ -1,0 +1,60 @@
+/* Свои стили X-tractor поверх Bootstrap 5: только то, чего в нём нет. */
+
+/* d-flex и другие утилиты задают display с !important и перебивают атрибут hidden */
+[hidden] {
+  display: none !important;
+}
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+}
+
+.x-blue {
+  stroke: var(--bs-primary);
+}
+
+.x-green {
+  stroke: var(--bs-success);
+}
+
+.small-2 {
+  font-size: 0.75rem;
+}
+
+.section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--bs-secondary-color);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-thin {
+  height: 6px;
+}
+
+.empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--bs-secondary-color);
+}
+
+/* Модальные окна и боковая панель показываются из Vue, без JS Bootstrap */
+.modal.show,
+.offcanvas.show {
+  display: block;
+}
+
+.offcanvas.show {
+  visibility: visible;
+  transform: none;
+}
+
+.toast-container {
+  z-index: 1090;
+}

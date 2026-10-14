@@ -6,6 +6,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # VERSION=$(git describe --tags --always --dirty) docker-compose up --build
+        VERSION: ${VERSION:-dev}
     restart: always
     extra_hosts:
        elasticsearch: 10.4.3.224 #Elasticsearch IP

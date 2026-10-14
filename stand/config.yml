@@ -1,0 +1,13 @@
+# Конфиг extractor для тестового стенда: оба кластера - заглушка stand/mock_es.py.
+app:
+  port: 19400
+  bind: 127.0.0.1
+  kibana: kibana.example.com
+snapshot:
+  host: http://127.0.0.1:19200/
+  name: recoverer
+  is_s3: false
+search:
+  host: http://127.0.0.1:19200/
+  name: opensearch
+  request_batch: 500

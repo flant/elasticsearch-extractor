@@ -18,15 +18,24 @@ Since there's no authentication layer implemented in elasticsearch-extractor, yo
 
 # Using
 
-## Installing & running in Linux with systemd
+## Building
 
-To build & install elasticsearch-extractor on Linux (with systemd), please use the following commands:
+The UI is written in Vue 3 + TypeScript (`web/`) and is embedded into the Go binary with `go:embed`.
+`make` builds the UI with Node.js when `npm` is available, otherwise in a `node:24-alpine` container, and then the binary:
 
 ```
-$ go get -u github.com/jteeuwen/go-bindata/...
 $ git clone https://github.com/flant/elasticsearch-extractor.git
 $ cd elasticsearch-extractor
 $ make
+```
+
+The binary is `./build/elasticsearch-extractor`. Without a UI build the server answers that the UI is not built.
+
+The version comes from git: `git describe --tags --always --dirty`, e.g. `v0.2.28` on a tag or `v0.2.28-9-g72b3614` after it. To release a version, tag the commit (`git tag v0.3.0`) and build. `extractor -V` prints it.
+
+## Installing & running in Linux with systemd
+
+```
 $ sudo cp ./build/elasticsearch-extractor /usr/local/sbin/extractor
 $ sudo cp ./examples/main.yml /usr/local/etc/extractor.yml
 $ sudo cp ./examples/extractor.service /etc/systemd/system/
@@ -35,18 +44,35 @@ $ sudo systemctl daemon-reload && systemctl start extractor
 $ sudo systemctl enable extractor
 ```
 
-## Hot reload
+## Running in Docker
+
+The Dockerfile builds the UI and the binary itself. `.git` is not sent to the build, so the version is passed as an argument; `make docker` does it:
+
+```
+make docker
+# or
+VERSION=$(git describe --tags --always --dirty) docker-compose up --build --force-recreate -d
+```
+
+## Development
+
+### Test stand
+
+`make stand` starts an Elasticsearch mock with demo data (`stand/mock_es.py`), the extractor built from the current code and the UI on the Vite dev server, available on the network at port 5173 (`STAND_PORT`). Changes in `web/src` are applied without a restart. Node.js is not required, Vite runs in a container.
+
+```
+make stand          # (re)start
+make stand-status   # listening ports
+make stand-stop     # stop
+```
+
+### Hot reload of the backend
+
 Use `air`:
+
 ```bash
 $ go install github.com/air-verse/air@latest
 $ air
-
-```
-
-## Running in Docker
-
-```
-docker-compose up --build --force-recreate -d
 ```
 
 # Further information
