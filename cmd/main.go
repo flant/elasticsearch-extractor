@@ -67,7 +67,7 @@ func run() int {
 		slog.Error("bad configuration", "file", cfgPath, "error", err)
 		return 2
 	}
-	log := newLogger(cfg.App.LogFormat)
+	log := newLogger(cfg.App.LogFormat, cfg.App.DebugMode)
 	slog.SetDefault(log)
 
 	timeout := time.Duration(cfg.App.TimeOut) * time.Second
@@ -161,9 +161,16 @@ func clusterOptions(c config.Cluster, timeout time.Duration) opensearch.Options 
 	}
 }
 
-func newLogger(format string) *slog.Logger {
-	if format == "json" {
-		return slog.New(slog.NewJSONHandler(os.Stdout, nil))
+func newLogger(format string, debug bool) *slog.Logger {
+
+	var opts slog.HandlerOptions
+
+	if debug {
+		opts = slog.HandlerOptions{AddSource: true}
 	}
-	return slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	if format == "json" {
+		return slog.New(slog.NewJSONHandler(os.Stdout, &opts))
+	}
+	return slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{AddSource: true}))
 }

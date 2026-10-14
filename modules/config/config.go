@@ -51,6 +51,7 @@ type Config struct {
 		ExportTTLRaw string        `yaml:"export_ttl"`
 		// Формат журнала: text (по умолчанию) или json. Необязательный.
 		LogFormat string `yaml:"log_format"`
+		DebugMode bool   `yaml:"debug_mode,omitempty"`
 	} `yaml:"app"`
 	Snapshot Cluster `yaml:"snapshot"`
 	Search   struct {
