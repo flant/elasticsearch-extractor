@@ -7,7 +7,8 @@ app:
   data_dir: /tmp/data
   export_ttl: 1h
   log_format: json
-  debug_mode: true
+# При debug_mode=true в логи добавляется имя файла, строка и функция из которой был показано лог-сообщение
+  debug_mode: false
 snapshot:
   host: https://localhost:9200/
   name: recoverer
