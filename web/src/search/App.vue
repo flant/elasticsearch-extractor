@@ -401,7 +401,7 @@ onMounted(async () => {
         <form class="card" @submit.prevent="run">
           <div class="card-body d-flex flex-column gap-2">
             <div class="d-flex flex-wrap gap-2">
-              <div class="input-group flex-grow-1 query">
+              <div class="input-group query">
                 <span class="input-group-text"><Icon name="search" /></span>
                 <input
                   v-model="xql"
@@ -536,6 +536,8 @@ onMounted(async () => {
 <style scoped>
 .query {
   min-width: 260px;
+  flex: 1 1 18rem;
+  width: auto;
 }
 
 .range input {
