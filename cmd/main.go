@@ -14,7 +14,7 @@
 // extractor - веб-интерфейс для извлечения индексов из снапшотов Elasticsearch/OpenSearch
 // и выгрузки найденного в CSV/JSON.
 //
-//	extractor [-config FILE] [-listen ADDR]   UI, API и метрики
+//	extractor [-config FILE] [-listen ADDR]   UI, API
 //	extractor -V                              версия
 package main
 

@@ -16,10 +16,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"sort"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -38,12 +35,11 @@ type Options struct {
 }
 
 type Client struct {
-	name  string
-	base  string
-	user  string
-	pass  string
-	http  *http.Client
-	stats stats
+	name string
+	base string
+	user string
+	pass string
+	http *http.Client
 }
 
 // Error - ответ кластера с кодом не 2xx.
@@ -89,7 +85,6 @@ func New(o Options) (*Client, error) {
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
-		stats: stats{ops: map[opKey]*OpStat{}},
 	}, nil
 }
 
@@ -126,7 +121,6 @@ func seg(s string) string {
 }
 
 // do выполняет запрос: body кодируется в JSON, ответ декодируется в out (если не nil).
-// op - имя операции для метрик.
 func (c *Client) do(ctx context.Context, op, method, path string, body, out any) error {
 	var rd io.Reader
 	if body != nil {
@@ -146,15 +140,12 @@ func (c *Client) do(ctx context.Context, op, method, path string, body, out any)
 		req.SetBasicAuth(c.user, c.pass)
 	}
 
-	start := time.Now()
 	resp, err := c.http.Do(req)
 	if err != nil {
-		c.stats.add(op, 0, time.Since(start))
 		return fmt.Errorf("opensearch %s: %w", c.name, err)
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(resp.Body)
-	c.stats.add(op, resp.StatusCode, time.Since(start))
 	if err != nil {
 		return fmt.Errorf("opensearch %s: %w", c.name, err)
 	}
@@ -194,62 +185,4 @@ func parseError(status int, raw []byte) error {
 		}
 	}
 	return out
-}
-
-/* ---------- Метрики запросов ---------- */
-
-type opKey struct {
-	op   string
-	code int
-}
-
-// OpStat - сколько было запросов одной операции с одним кодом ответа и сколько они заняли.
-type OpStat struct {
-	Op      string
-	Code    int // 0 - запрос не дошёл до кластера
-	Count   int64
-	Seconds float64
-}
-
-type stats struct {
-	mu  sync.Mutex
-	ops map[opKey]*OpStat
-}
-
-func (s *stats) add(op string, code int, d time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	k := opKey{op, code}
-	st := s.ops[k]
-	if st == nil {
-		st = &OpStat{Op: op, Code: code}
-		s.ops[k] = st
-	}
-	st.Count++
-	st.Seconds += d.Seconds()
-}
-
-// Stats возвращает счётчики запросов, упорядоченные по операции и коду.
-func (c *Client) Stats() []OpStat {
-	c.stats.mu.Lock()
-	defer c.stats.mu.Unlock()
-	out := make([]OpStat, 0, len(c.stats.ops))
-	for _, s := range c.stats.ops {
-		out = append(out, *s)
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Op != out[j].Op {
-			return out[i].Op < out[j].Op
-		}
-		return out[i].Code < out[j].Code
-	})
-	return out
-}
-
-// CodeLabel - код ответа для метки метрики; 0 - сетевая ошибка.
-func (s OpStat) CodeLabel() string {
-	if s.Code == 0 {
-		return "error"
-	}
-	return strconv.Itoa(s.Code)
 }

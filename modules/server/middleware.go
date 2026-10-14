@@ -62,7 +62,7 @@ func (r *recorder) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// accessLog пишет запись о каждом запросе; проверки и метрики - только в debug.
+// accessLog пишет запись о каждом запросе;
 func (s *Server) accessLog(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()

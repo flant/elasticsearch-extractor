@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 
 // Две страницы, как их отдаёт backend: / - снапшоты, /search/ - поиск.
 // Сборка идёт в dist/ui, чтобы закоммиченный dist/.gitkeep пережил её.
-// API, выгрузки, метрики и проверки в режиме разработки проксируются на Go-backend: BACKEND=http://host:port.
+// API, выгрузки в режиме разработки проксируются на Go-backend: BACKEND=http://host:port.
 
 // В режиме разработки /search/ ведёт на search.html, как в backend.
 const pages: Plugin = {
@@ -34,8 +34,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
-      // всё, что отдаёт extractor, а не UI: API, выгрузки, метрики и проверки
-      proxy: { '/api': backend, '/data': backend, '/metrics': backend, '/healthz': backend, '/readyz': backend },
+      // всё, что отдаёт extractor, а не UI: API, выгрузки
+      proxy: { '/api': backend, '/data': backend },
     },
   }
 })
