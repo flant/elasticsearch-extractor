@@ -4,6 +4,7 @@
 #
 #   python3 mock_es.py [LOG] [PORT]
 import json
+import random
 import re
 import sys
 import time
@@ -82,12 +83,28 @@ PODS = ["backend-7f9c6d-x2k4p", "backend-7f9c6d-q8m1z", "backend-7f9c6d-lp3wd"]
 NAMESPACES = ["production", "production", "staging"]
 
 
+# Средний промежуток между записями (с): днём записи идут чаще, ночью реже, и есть два
+# всплеска ошибок - 3 часа и 9 часов назад, чтобы на гистограмме было что рассмотреть.
+def mean_gap(age):
+    hour = (datetime.now(timezone.utc) - timedelta(seconds=age)).hour
+    gap = 30 if 7 <= hour < 22 else 70
+    for center, width in ((3 * 3600, 15 * 60), (9 * 3600, 30 * 60)):
+        if abs(age - center) < width:
+            gap = 3
+    return gap
+
+
 def make_docs():
     start = datetime.now(timezone.utc).replace(microsecond=0)
+    rnd = random.Random(42)
     docs = []
-    for i in range(2000):
+    age = 0.0
+    i = 0
+    while age < 26 * 3600:
         level, text, status = MESSAGES[(i * 7) % len(MESSAGES)]
-        ts = start - timedelta(seconds=43 * i)
+        if mean_gap(age) == 3 and i % 3:
+            level, text, status = MESSAGES[0]  # во время всплеска - в основном ошибки
+        ts = start - timedelta(seconds=int(age))
         docs.append({
             "_index": f"app-backend-{ymd(ts.date())}", "_id": f"id{i}",
             # значение сортировки по @timestamp, как его отдаёт ES: миллисекунды
@@ -100,6 +117,8 @@ def make_docs():
                 "http": {"status": status},
             },
         })
+        age += rnd.expovariate(1 / mean_gap(age))
+        i += 1
     return docs
 
 
@@ -167,6 +186,28 @@ def match_clause(src, c):
             return False
         return True
     return True
+
+
+def doc_ms(d):
+    t = datetime.strptime(d["_source"]["@timestamp"][:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    return int(t.timestamp() * 1000)
+
+
+def date_histogram(found, h):
+    """Агрегация date_histogram, как её считает ES: столбцы от эпохи с шагом fixed_interval,
+    пустые столбцы на всём extended_bounds."""
+    step = int(h["fixed_interval"].rstrip("s")) * 1000
+    counts = {}
+    for d in found:
+        k = doc_ms(d) // step * step
+        counts[k] = counts.get(k, 0) + 1
+    bounds = h.get("extended_bounds") or {}
+    keys = set(counts)
+    if bounds:
+        keys |= set(range(int(bounds["min"]) // step * step, int(bounds["max"]) + 1, step))
+    buckets = [{"key_as_string": str(k), "key": k, "doc_count": counts.get(k, 0)} for k in sorted(keys)]
+    return {"took": 5, "hits": {"total": {"value": len(found), "relation": "eq"}, "hits": []},
+            "aggregations": {"histogram": {"buckets": buckets}}}
 
 
 def run_query(q):
@@ -287,6 +328,9 @@ class Handler(BaseHTTPRequestHandler):
         if p.endswith("/_search"):
             q = json.loads(b or "{}")
             found = run_query(q.get("query"))
+            hist = (q.get("aggs") or {}).get("histogram", {}).get("date_histogram")
+            if hist:
+                return self.send(date_histogram(found, hist))
             if q.get("search_after"):
                 # следующая страница: документы после последнего показанного
                 after = q["search_after"][0]

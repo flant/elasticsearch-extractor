@@ -9,6 +9,7 @@ import {
   getConfig,
   getIndexGroups,
   getMapping,
+  histogram,
   newFname,
   search,
   type Cluster,
@@ -16,6 +17,7 @@ import {
   type ExportResult,
   type Filter,
   type Hit,
+  type Histogram,
   type SearchParams,
 } from '../api'
 import { bytes, inputToUTC, num, searchTerms, seconds, utcString, utcToInput } from '../format'
@@ -24,6 +26,7 @@ import Icon from '../components/Icon.vue'
 import TopBar from '../components/TopBar.vue'
 import FieldList from './FieldList.vue'
 import FilterDialog from './FilterDialog.vue'
+import HistogramChart from './Histogram.vue'
 import ResultsTable from './ResultsTable.vue'
 
 const MIN = 60_000
@@ -58,6 +61,8 @@ const loadingMore = ref(false)
 const total = ref<number | null>(null)
 const took = ref<number | undefined>()
 const searched = ref<SearchParams | null>(null)
+// Гистограмма найденного по времени; без поля времени её нет
+const hist = ref<Histogram | null>(null)
 const searching = ref(false)
 const searchError = ref('')
 const sessionLost = ref(false)
@@ -172,8 +177,13 @@ async function run() {
   searching.value = true
   writeURL()
   try {
-    const [res, n] = await Promise.all([search(p), count(p).catch(() => null)])
+    const [res, n, h] = await Promise.all([
+      search(p),
+      count(p).catch(() => null),
+      p.timefields.length ? histogram(p).catch(() => null) : Promise.resolve(null),
+    ])
     hits.value = res.hits
+    hist.value = h
     next.value = res.next
     took.value = res.took
     total.value = n
@@ -181,6 +191,7 @@ async function run() {
   } catch (e) {
     fail(e, searchError)
     hits.value = []
+    hist.value = null
     next.value = undefined
     total.value = null
     searched.value = null
@@ -205,6 +216,15 @@ async function loadMore() {
   } finally {
     loadingMore.value = false
   }
+}
+
+// Промежуток с гистограммы (клик по столбцу или выделение): он становится промежутком
+// поиска - поля времени показывают его, и поиск идёт сразу.
+function selectRange(a: number, b: number) {
+  preset.value = null
+  from.value = utcToInput(a)
+  to.value = utcToInput(b)
+  run()
 }
 
 /* ---------- Фильтры ---------- */
@@ -502,6 +522,8 @@ onMounted(async () => {
             <Icon name="alert" />
             <span>Не удалось выгрузить <code>{{ fileName }}</code>: {{ exporting.error }}</span>
           </div>
+
+          <HistogramChart v-if="hist" :data="hist" :loading="searching" @select="selectRange" />
 
           <ResultsTable
             v-if="hits.length"

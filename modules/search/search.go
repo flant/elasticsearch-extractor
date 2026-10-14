@@ -245,3 +245,104 @@ func flatten(prefix string, props map[string]any, out map[string]string) {
 		}
 	}
 }
+
+/* ---------- Гистограмма ---------- */
+
+// HistogramBuckets - примерно столько столбцов в гистограмме: интервал выбирается так,
+// чтобы их было не больше.
+const HistogramBuckets = 100
+
+// Интервалы столбцов от секунды до недели: "круглые" значения, понятные человеку.
+var histogramSteps = []time.Duration{
+	time.Second, 2 * time.Second, 5 * time.Second, 10 * time.Second, 15 * time.Second, 30 * time.Second,
+	time.Minute, 2 * time.Minute, 5 * time.Minute, 10 * time.Minute, 15 * time.Minute, 30 * time.Minute,
+	time.Hour, 2 * time.Hour, 3 * time.Hour, 6 * time.Hour, 12 * time.Hour,
+	24 * time.Hour, 48 * time.Hour, 7 * 24 * time.Hour,
+}
+
+// Interval - самый мелкий интервал, при котором на промежутке не больше HistogramBuckets столбцов.
+func Interval(span time.Duration) time.Duration {
+	for _, s := range histogramSteps {
+		if span/s <= HistogramBuckets {
+			return s
+		}
+	}
+	return histogramSteps[len(histogramSteps)-1]
+}
+
+// Bucket - столбец гистограммы: начало (мс, UTC) и число найденных записей.
+type Bucket struct {
+	T int64 `json:"t"`
+	N int64 `json:"n"`
+}
+
+// Histogram - число найденных записей по времени. Время в мс UTC.
+type Histogram struct {
+	From     int64    `json:"from"`
+	To       int64    `json:"to"`
+	Interval int64    `json:"interval"`
+	Total    int64    `json:"total"`
+	Buckets  []Bucket `json:"buckets"`
+}
+
+// HistogramBody - тело _search для гистограммы: тот же запрос, что у поиска, и агрегация
+// date_histogram по полю времени с пустыми столбцами на всём промежутке.
+func HistogramBody(p Params) (body map[string]any, h *Histogram, err error) {
+	tf := p.Timefield()
+	if tf == "" {
+		return nil, nil, fmt.Errorf("%w: histogram needs a time field", ErrInvalid)
+	}
+	q, err := Query(p)
+	if err != nil {
+		return nil, nil, err
+	}
+	// Даты уже проверены в Query
+	ds, _ := time.Parse(dateLayout, p.DateStart)
+	de, _ := time.Parse(dateLayout, p.DateEnd)
+	if !de.After(ds) {
+		return nil, nil, fmt.Errorf("%w: date_end must be after date_start", ErrInvalid)
+	}
+	interval := Interval(de.Sub(ds))
+	h = &Histogram{From: ds.UnixMilli(), To: de.UnixMilli(), Interval: interval.Milliseconds(), Buckets: []Bucket{}}
+	body = map[string]any{
+		"size":             0,
+		"track_total_hits": true,
+		"query":            q,
+		"aggs": map[string]any{"histogram": map[string]any{"date_histogram": map[string]any{
+			"field":           tf,
+			"fixed_interval":  fmt.Sprintf("%ds", int64(interval/time.Second)),
+			"min_doc_count":   0,
+			"extended_bounds": map[string]any{"min": h.From, "max": h.To},
+			"format":          "epoch_millis",
+		}}},
+	}
+	return body, h, nil
+}
+
+// HistogramOf - гистограмма найденного по p на промежутке date_start..date_end.
+func HistogramOf(ctx context.Context, c *opensearch.Client, p Params) (*Histogram, error) {
+	body, h, err := HistogramBody(p)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.Search(ctx, p.Index, body, "")
+	if err != nil {
+		return nil, err
+	}
+	var agg struct {
+		Buckets []struct {
+			Key   float64 `json:"key"`
+			Count int64   `json:"doc_count"`
+		} `json:"buckets"`
+	}
+	if raw, ok := resp.Aggregations["histogram"]; ok {
+		if err := json.Unmarshal(raw, &agg); err != nil {
+			return nil, fmt.Errorf("histogram: %w", err)
+		}
+	}
+	for _, b := range agg.Buckets {
+		h.Buckets = append(h.Buckets, Bucket{T: int64(b.Key), N: b.Count})
+		h.Total += b.Count
+	}
+	return h, nil
+}

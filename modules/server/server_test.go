@@ -45,6 +45,8 @@ func (e *es) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasSuffix(p, "/_search") && strings.Contains(string(b), `"bad query`):
 		w.WriteHeader(400)
 		_, _ = io.WriteString(w, `{"error":{"type":"query_shard_exception","reason":"failed to create query"},"status":400}`)
+	case strings.HasSuffix(p, "/_search") && strings.Contains(string(b), `"date_histogram"`):
+		_, _ = io.WriteString(w, `{"took":1,"hits":{"hits":[]},"aggregations":{"histogram":{"buckets":[{"key":1791712800000,"doc_count":5}]}}}`)
 	case strings.HasSuffix(p, "/_search") || p == "/_search/scroll":
 		if r.Method == http.MethodDelete {
 			_, _ = io.WriteString(w, `{}`)
@@ -197,5 +199,17 @@ func TestExportAndDownload(t *testing.T) {
 	code, _, _ = call(t, h, `{"action":"prepare_json","search":{"cluster":"Search","index":"app-*","fname":"../x"}}`)
 	if code != 400 {
 		t.Errorf("bad file name: %d", code)
+	}
+}
+
+func TestHistogram(t *testing.T) {
+	h, _ := newServer(t)
+	code, m, raw := call(t, h, `{"action":"histogram","search":{"cluster":"Search","index":"app-*","timefields":["@timestamp"],"date_start":"2026-10-11 10:00:00","date_end":"2026-10-11 12:00:00"}}`)
+	if code != 200 || m["interval"] != float64(120000) || m["total"] != float64(5) || len(m["buckets"].([]any)) != 1 {
+		t.Errorf("%d %s", code, raw)
+	}
+	code, _, raw = call(t, h, `{"action":"histogram","search":{"cluster":"Search","index":"app-*"}}`)
+	if code != 400 {
+		t.Errorf("no time field: %d %s", code, raw)
 	}
 }

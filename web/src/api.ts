@@ -271,6 +271,19 @@ export async function count(p: SearchParams): Promise<number> {
   return raw.count ?? 0
 }
 
+// Гистограмма найденного по времени: время в мс UTC, интервал выбирает сервер (~100 столбцов).
+export interface Histogram {
+  from: number
+  to: number
+  interval: number
+  total: number
+  buckets: { t: number; n: number }[]
+}
+
+export function histogram(p: SearchParams): Promise<Histogram> {
+  return callJSON<Histogram>('histogram', { search: { ...p, count: false } })
+}
+
 export type ExportFormat = 'csv' | 'json'
 
 export interface ExportResult {
