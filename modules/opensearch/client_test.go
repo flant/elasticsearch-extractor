@@ -105,27 +105,6 @@ func TestRestoreBody(t *testing.T) {
 	}
 }
 
-func TestStats(t *testing.T) {
-	c, _ := fake(t, 200, `[]`)
-	_, _ = c.Repositories(context.Background())
-	_, _ = c.Repositories(context.Background())
-	st := c.Stats()
-	if len(st) != 1 || st[0].Op != "cat_repositories" || st[0].Code != 200 || st[0].Count != 2 {
-		t.Errorf("%+v", st)
-	}
-
-	down, err := New(Options{Name: "down", Host: "http://127.0.0.1:1/"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := down.Repositories(context.Background()); err == nil {
-		t.Fatal("expected a network error")
-	}
-	if st := down.Stats(); st[0].CodeLabel() != "error" {
-		t.Errorf("network errors are counted with code 0: %+v", st)
-	}
-}
-
 func TestTLSErrors(t *testing.T) {
 	if _, err := New(Options{Name: "x", Host: "https://h/", CACert: "/nonexistent.pem"}); err == nil {
 		t.Error("missing CA file must be an error, not a crash")

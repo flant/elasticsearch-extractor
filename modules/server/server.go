@@ -184,6 +184,12 @@ func (s *Server) handle(ctx context.Context, r *http.Request, req apiRequest) (a
 			return map[string]int64{"count": n}, err
 		}
 		return search.Search(ctx, c, req.Search)
+	case "histogram":
+		c, err := s.cluster(req.Search.Cluster)
+		if err != nil {
+			return nil, err
+		}
+		return search.HistogramOf(ctx, c, req.Search)
 	case "prepare_csv", "prepare_json":
 		c, err := s.cluster(req.Search.Cluster)
 		if err != nil {

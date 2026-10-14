@@ -220,7 +220,9 @@ type Hit struct {
 type SearchResponse struct {
 	Took     int    `json:"took"`
 	ScrollID string `json:"_scroll_id,omitempty"`
-	Hits     struct {
+	// Результаты агрегаций по их именам, разбирает тот, кто их запросил
+	Aggregations map[string]json.RawMessage `json:"aggregations,omitempty"`
+	Hits         struct {
 		Total struct {
 			Value    int64  `json:"value"`
 			Relation string `json:"relation,omitempty"`

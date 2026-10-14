@@ -191,3 +191,71 @@ func TestGroupsAndMapping(t *testing.T) {
 		t.Errorf("%v", m)
 	}
 }
+
+func TestInterval(t *testing.T) {
+	for span, want := range map[time.Duration]time.Duration{
+		10 * time.Second:     time.Second,
+		15 * time.Minute:     10 * time.Second,
+		2 * time.Hour:        2 * time.Minute,
+		24 * time.Hour:       15 * time.Minute,
+		7 * 24 * time.Hour:   2 * time.Hour,
+		400 * 24 * time.Hour: 7 * 24 * time.Hour,
+	} {
+		if got := Interval(span); got != want {
+			t.Errorf("%v: %v, want %v", span, got, want)
+		}
+		if got := Interval(span); span/got > HistogramBuckets && got != 7*24*time.Hour {
+			t.Errorf("%v: %d buckets", span, span/got)
+		}
+	}
+}
+
+func TestHistogramBody(t *testing.T) {
+	p := params()
+	p.DateStart, p.DateEnd = "2026-10-11 10:00:00", "2026-10-11 12:00:00"
+	body, h, err := HistogramBody(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := mustJSON(t, body)
+	for _, want := range []string{
+		`"size":0`, `"field":"@timestamp"`, `"fixed_interval":"120s"`, `"min_doc_count":0`,
+		`"extended_bounds":{"max":1791720000000,"min":1791712800000}`, `"range":{"@timestamp"`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("no %s in %s", want, s)
+		}
+	}
+	if h.Interval != 120000 || h.From != 1791712800000 || h.To != 1791720000000 {
+		t.Errorf("%+v", h)
+	}
+
+	p.Timefields = nil
+	if _, _, err := HistogramBody(p); !errors.Is(err, ErrInvalid) {
+		t.Errorf("no time field: %v", err)
+	}
+	p = params()
+	p.DateEnd = p.DateStart
+	if _, _, err := HistogramBody(p); !errors.Is(err, ErrInvalid) {
+		t.Errorf("empty range: %v", err)
+	}
+}
+
+func TestHistogramOf(t *testing.T) {
+	c := es(t, 0, func(w http.ResponseWriter, r *http.Request) bool {
+		_, _ = io.WriteString(w, `{"took":1,"hits":{"hits":[]},"aggregations":{"histogram":{"buckets":[
+			{"key_as_string":"1791712800000","key":1791712800000,"doc_count":3},
+			{"key_as_string":"1791712920000","key":1791712920000,"doc_count":0},
+			{"key_as_string":"1791713040000","key":1791713040000,"doc_count":7}]}}}`)
+		return true
+	})
+	p := params()
+	p.DateStart, p.DateEnd = "2026-10-11 10:00:00", "2026-10-11 12:00:00"
+	h, err := HistogramOf(context.Background(), c, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if h.Total != 10 || len(h.Buckets) != 3 || h.Buckets[2] != (Bucket{T: 1791713040000, N: 7}) {
+		t.Errorf("%+v", h)
+	}
+}
