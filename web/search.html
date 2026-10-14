@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="ru" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Адрес Kibana подставляет backend через text/template; без подстановки остаётся как есть и игнорируется -->
+    <meta name="xtractor-kibana" content="{{.}}" />
+    <title>X-tractor · Поиск</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 3.5l9 9' stroke='%232a78d6' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M12.5 3.5l-9 9' stroke='%231baf7a' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E" />
+  </head>
+  <body class="bg-body-tertiary">
+    <div id="app"></div>
+    <script type="module" src="/src/search/main.ts"></script>
+  </body>
+</html>

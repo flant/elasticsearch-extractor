@@ -3,5 +3,7 @@ build
 bin
 vendor
 *~
-go.sum
-
+web/node_modules
+web/dist/ui
+stand/.run
+design

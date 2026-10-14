@@ -1,9 +1,22 @@
+# Сборка extractor
 /build/
 /bin/
 /vendor/
-/modules/front/
+/design/
+
+# Новый UI: зависимости и сборка; web/dist/.gitkeep нужен go:embed до первой сборки
+/web/node_modules/
+/web/dist/*
+!/web/dist/.gitkeep
+*.tsbuildinfo
+
+# Тестовый стенд: бинарник, логи и pid-файлы
+/stand/.run/
+__pycache__/
+*.pyc
+
+# Локальные файлы
 *~
-go.sum
 test.yml
 admin-crt.pem
 admin-key.pem
