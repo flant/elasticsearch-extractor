@@ -20,9 +20,15 @@ const STEPS = [1, 2, 5, 10, 15, 30]
 const PAD = { l: 44, r: 8, t: 8, b: 20 }
 
 const box = ref<HTMLElement>()
+// Подсказка над столбцом: число записей и его промежуток
+const tip = ref<{ left: number; count: string; period: string } | null>(null)
+const tipEl = ref<HTMLElement>()
 const canvas = ref<HTMLCanvasElement>()
 const nf = new Intl.NumberFormat('ru-RU')
 let drag: { x0: number; x1: number } | null = null
+// Нарисованные столбцы (в CSS-пикселях): по ним видно, что курсор над столбцом
+let rects: { x0: number; x1: number; y0: number; t: number; n: number }[] = []
+let baseline = 0
 
 /* ---------- Отрисовка ---------- */
 
@@ -38,6 +44,13 @@ function label(t: number, step: number): string {
   if (step < MIN) return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
   if (step < DAY && (d.getUTCHours() !== 0 || d.getUTCMinutes() !== 0)) return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`
   return `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)}`
+}
+
+// Время с секундами; дата - если промежуток длиннее суток
+function edge(t: number, span: number): string {
+  const d = new Date(t)
+  const time = `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`
+  return span >= DAY ? `${pad(d.getUTCDate())}.${pad(d.getUTCMonth() + 1)} ${time}` : time
 }
 
 function human(ms: number): string {
@@ -108,23 +121,43 @@ function draw() {
   const bw = Math.max(1, x(h.from + h.interval, w) - x(h.from, w) - 1)
   ctx.fillStyle = bar
   ctx.globalAlpha = 0.8
+  rects = []
+  baseline = y(0)
   for (const b of h.buckets) {
     const x0 = Math.max(PAD.l, x(b.t, w))
     const x1 = Math.min(w - PAD.r, x(b.t, w) + bw)
-    if (x1 > x0 && b.n > 0) ctx.fillRect(x0, y(b.n), x1 - x0, y(0) - y(b.n))
+    if (x1 > x0 && b.n > 0) {
+      ctx.fillRect(x0, y(b.n), x1 - x0, baseline - y(b.n))
+      rects.push({ x0, x1, y0: y(b.n), t: b.t, n: b.n })
+    }
   }
   ctx.globalAlpha = 1
 
-  // Ось времени
+  // Ось времени. Начало и конец промежутка подписаны всегда, с секундами: при сильном
+  // увеличении промежуточных меток может не остаться, а период должен быть виден.
   const span = h.to - h.from
-  const tStep = STEPS.find((s) => (s / span) * (w - PAD.l - PAD.r) >= 90) ?? STEPS[STEPS.length - 1]
+  const ty = hh - PAD.b + 5
   ctx.fillStyle = text
-  ctx.textAlign = 'center'
   ctx.textBaseline = 'top'
+  const left = edge(h.from, span)
+  const right = edge(h.to, span)
+  const lw = ctx.measureText(left).width
+  const rw = ctx.measureText(right).width
+  ctx.textAlign = 'left'
+  ctx.fillText(left, PAD.l, ty)
+  if (lw + rw + 16 <= w - PAD.l - PAD.r) {
+    ctx.textAlign = 'right'
+    ctx.fillText(right, w - PAD.r, ty)
+  }
+  // Промежуточные метки - только там, где они не наезжают на крайние
+  const tStep = STEPS.find((s) => (s / span) * (w - PAD.l - PAD.r) >= 90) ?? STEPS[STEPS.length - 1]
+  ctx.textAlign = 'center'
   for (let t = Math.ceil(h.from / tStep) * tStep; t <= h.to; t += tStep) {
     const xx = x(t, w)
-    if (xx < PAD.l + 15 || xx > w - PAD.r - 15) continue
-    ctx.fillText(label(t, tStep), xx, hh - PAD.b + 5)
+    const s = label(t, tStep)
+    const half = ctx.measureText(s).width / 2
+    if (xx - half < PAD.l + lw + 8 || xx + half > w - PAD.r - rw - 8) continue
+    ctx.fillText(s, xx, ty)
   }
 
   // Выделяемая область
@@ -146,6 +179,36 @@ function local(e: PointerEvent): number {
   return e.clientX - canvas.value!.getBoundingClientRect().left
 }
 
+// Над столбцом курсор - "палец": по столбцу можно кликнуть. В остальном месте - крестик
+// для выделения области (он задан в CSS).
+function pointer(e: PointerEvent) {
+  const c = canvas.value!
+  const r = c.getBoundingClientRect()
+  const px = e.clientX - r.left
+  const py = e.clientY - r.top
+  const bar = props.loading || py > baseline ? undefined : rects.find((b) => px >= b.x0 && px <= b.x1 && py >= b.y0)
+  c.style.cursor = bar ? 'pointer' : ''
+  showTip(bar, px)
+}
+
+function showTip(bar: (typeof rects)[number] | undefined, px: number) {
+  const h = props.data
+  if (!bar || !h) {
+    tip.value = null
+    return
+  }
+  // промежуток столбца, обрезанный границами поиска; дата - если он длиннее суток или через полночь
+  const a = Math.max(h.from, bar.t)
+  const b = Math.min(h.to, bar.t + h.interval)
+  const days = h.interval >= DAY || new Date(a).getUTCDate() !== new Date(b).getUTCDate() ? DAY : 0
+  tip.value = { left: px, count: nf.format(bar.n), period: `${edge(a, days)} - ${edge(b, days)}` }
+  // не выходить за правый край
+  requestAnimationFrame(() => {
+    const el = tipEl.value
+    if (el && tip.value) tip.value.left = Math.max(0, Math.min(px + 12, width() - el.offsetWidth))
+  })
+}
+
 // Промежуток наверх: в поля времени попадают целые секунды, не короче секунды
 function select(a: number, b: number) {
   const h = props.data!
@@ -158,13 +221,23 @@ function select(a: number, b: number) {
 function down(e: PointerEvent) {
   if (e.button !== 0 || !props.data || props.loading) return
   canvas.value!.setPointerCapture(e.pointerId)
+  canvas.value!.style.cursor = ''
+  tip.value = null
   drag = { x0: local(e), x1: local(e) }
 }
 
 function move(e: PointerEvent) {
-  if (!drag) return
+  if (!drag) {
+    pointer(e)
+    return
+  }
   drag.x1 = local(e)
   schedule()
+}
+
+function leave() {
+  tip.value = null
+  if (!drag && canvas.value) canvas.value.style.cursor = ''
 }
 
 function up() {
@@ -189,7 +262,13 @@ function cancel() {
   schedule()
 }
 
-watch(() => props.data, schedule)
+watch(
+  () => props.data,
+  () => {
+    tip.value = null
+    schedule()
+  },
+)
 
 let resize: ResizeObserver | undefined
 let theme: MutationObserver | undefined
@@ -225,13 +304,31 @@ onBeforeUnmount(() => {
           @pointermove="move"
           @pointerup="up"
           @pointercancel="cancel"
+          @pointerleave="leave"
         ></canvas>
+        <div v-if="tip" ref="tipEl" class="chart-tip small" :style="{ left: `${tip.left}px` }">
+          <strong class="tabular">{{ tip.count }}</strong>
+          <div class="tabular text-body-secondary">{{ tip.period }}</div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.chart-tip {
+  position: absolute;
+  top: 4px;
+  z-index: 2;
+  pointer-events: none;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: var(--bs-border-radius-sm);
+  background: var(--bs-body-bg);
+  border: 1px solid var(--bs-border-color);
+  box-shadow: var(--bs-box-shadow-sm);
+}
+
 .chart {
   position: relative;
   height: 170px;
